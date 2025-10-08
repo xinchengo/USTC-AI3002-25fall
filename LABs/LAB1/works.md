@@ -1,0 +1,3 @@
+- 写完代码
+- 挑高学习率，发生 NaN Error
+- 增加了 Weight Clipping，消除了 NaN Error，但学习过程还是很慢
