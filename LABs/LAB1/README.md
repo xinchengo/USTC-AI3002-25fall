@@ -26,6 +26,7 @@
 
 ```bash
 conda create -n ai25 python=3.10
+conda activate ai25
 ```
 
 **安装必须的库**
@@ -39,7 +40,7 @@ pip install numpy pandas scikit-learn matplotlib
 你的报告应该符合规范，包含以下内容：
 
 + 你的实验过程 (3pt)
-+ 你的调整超参数的过程，发现的现象，做出的分析 (5pt)
++ 你的调整超参数的过程，发现的现象，做出的分析，以及你最终的超参数组合是什么？ (5pt)
 + 你是否尝试了正则化处理？你发现效果如何？你做出的分析是什么？(5pt)
 + 你还尝试了哪些其他的其他的改进方法？你做这些改进的动机是什么？改进后的实验效果有什么变化？你对此做出了怎样的分析？(10pt)
 + 展示在验证集上最终最好的实验效果以及对这个结果的分析思考。上限在哪儿？是否达到了上限？为什么？(5pt)
@@ -69,6 +70,8 @@ pip install numpy pandas scikit-learn matplotlib
 + report.pdf
 
 以`<学号>-<姓名>-LAB1.zip`格式提交到BB系统
+
+
 
 
 

@@ -183,6 +183,6 @@ class Trainer:
             all_pred = (all_pred > 0.5).astype(int)
             return f1_score(all_grd, all_pred)
         if metric == "auc":
-            all_pred = (all_pred > 0.5).astype(int)
             return roc_auc_score(all_grd, all_pred)
+
         
