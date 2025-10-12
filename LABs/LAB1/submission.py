@@ -3,8 +3,17 @@ import pandas as pd
 from basemodel import LinearModel
 from basetrainer import Trainer
 
+# Hard coded means and variance as only submission.py can be modified and it
+# is difficult to write in an elegant way
+means = np.array([75.69551257, 75.88411835, 25.59912651, 14.46471902, 14.49511892,
+       17.37787962, 17.39460244,  5.00415915,  2.34273872,  2.34712774,
+        0.50044896,  0.49955104,  0.48589551,  0.48596734])
+vars = np.array([41.98419881, 41.99594928,  7.83857358,  8.09928844,  8.12179282,
+        9.36365247,  9.36964422,  3.00000789,  1.86385224,  1.86166473,
+        0.50000159,  0.50000159,  0.49980282,  0.49980484])
+
 def load_and_preprocess_data(data_file: str = "data/train.csv"):
-    dataset = pd.read_csv(data_file)
+    dataset = pd.read_csv(data_file, dtype=np.float64)
     """
     Divide the dataset into features and target
 
@@ -15,6 +24,8 @@ def load_and_preprocess_data(data_file: str = "data/train.csv"):
         targets (np.ndarray): Target values, shape [num_samples]
     """
     print(dataset.columns)
+    # Normalize the dataset
+    dataset.iloc[:, :-1] = (dataset.iloc[:, :-1] - means) / np.sqrt(vars)
     # idxs = ['MWG', 'NWG', 'KWG', 'MDIMC', 'NDIMC', 'MDIMA', 'NDIMB',
     #         'KWI', 'VWM', 'VWN']
     # idxs = []
@@ -34,7 +45,7 @@ class LinearRegressionModel(LinearModel):
             in_features (int): Number of input features.
             out_features (int): Number of output features (usually 1).
         """
-        self.weight = np.random.randn(in_features, out_features) * 1e-2
+        self.weight = np.random.randn(in_features, out_features) * 1e-6
         self.bias = np.zeros((1, out_features))
 
     def forward(self, features: np.ndarray) -> np.ndarray:
@@ -77,8 +88,7 @@ class LinearRegressionModel(LinearModel):
         m = features.shape[0] # Batch size 
         loss = (1/(2*m)) * np.sum((predictions - targets) ** 2)
         dw, db = self.gradient(features, targets, predictions)
-        np.clip(dw, -1, 1, out=dw)
-        np.clip(db, -1, 1, out=db)
+
         self.weight -= learning_rate * dw
         self.bias -= learning_rate * db
         # print(f"Weight norm: {np.linalg.norm(self.weight)}, Bias norm: {np.linalg.norm(self.bias)}")
@@ -86,8 +96,8 @@ class LinearRegressionModel(LinearModel):
 
 class LinearRegressionTrainer(Trainer):
     def __init__(self, model, train_dataloader, eval_dataloader=None, 
-                 save_dir=None, learning_rate=0.1, eval_strategy="epoch", 
-                 eval_steps=100, num_epochs=100, eval_metric="mae"):
+                 save_dir=None, learning_rate=0.01, eval_strategy="epoch", 
+                 eval_steps=100, num_epochs=10, eval_metric="mae"):
         super().__init__(model, train_dataloader, eval_dataloader, save_dir, 
                          learning_rate, eval_strategy, eval_steps, num_epochs, eval_metric)
 
