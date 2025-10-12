@@ -1,0 +1,135 @@
+\documentclass{ctexart}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{geometry}
+\geometry{a4paper, left=1in, right=1in, top=1in, bottom=1in}
+
+\title{《人工智能与机器学习基础》第一次作业}
+\author{PB24000150 李欣宸}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{第一题}
+
+\subsection{(a)}
+
+\newcommand{\et}{\mathbb{E}_{\mathrm{train}}}
+\newcommand{\eyx}{\mathbb{E}_{y|\boldsymbol{x}}}
+\newcommand{\fwt}{f_{\hat{w}(\mathrm{train})}}
+\newcommand{\ft}{f_{\mathrm{true}}}
+\newcommand{\fb}{\overline{f}}
+\newcommand{\x}{\boldsymbol{x}}
+
+\begin{proof}
+
+考虑对一个固定的 $\x$，推导过程如下：
+
+\begin{equation}
+    \begin{aligned}
+        & \et[\eyx[ (y - \fwt(\x))^2 ]] \\
+        &= \et[\eyx[ ((y - \ft) + (\ft - \fwt))^2 ]] \\
+        &= \underbrace{\eyx[ \epsilon^2 ]}_{\sigma^2~\text{的定义}} + \underbrace{2\et[\eyx[ \epsilon(\ft(\x) - \fwt(\x)) ]]}_{\epsilon~\text{和}~\ft(\x) - \fwt(\x)~\text{相互独立}} + \et[\eyx[ (\ft(\x) - \fwt(\x))^2 ]] \\
+        &= \sigma^2 + 2\underbrace{\eyx[\epsilon]}_{=0}\et[ (\ft(\x) - \fwt(\x))] + \et[ (\ft(\x) - \fwt(\x))^2 ] \\
+        &= \sigma^2 + \et[ (\ft(\x) - \fwt(\x))^2 ]
+    \end{aligned}
+    \label{1a1}
+\end{equation}
+
+而对于 $\et[ (\ft(\x) - \fwt(\x))^2 ]$，我们又有：
+
+\begin{equation}
+    \begin{aligned}
+        & \et[ (\ft(\x) - \fwt(\x))^2 \\
+        &= \et[ ((\ft(\x) - \fb(\x)) + (\fb(\x) - \fwt(\x)))^2 ] \\
+        &= \underbrace{\et[ (\ft(\x) - \fb(\x))^2 ]}_{\mathrm{Bias}^2~\text{的定义}} + 2(\ft(\x) -\fb(\x))\underbrace{\et[ (\fb(\x) - \fwt(\x)) ]}_{\text{由}~\fb~\text{的定义，}=0} \\ &\quad+ \underbrace{\et[ (\fb(\x) - \fwt(\x))^2 ]}_{\mathrm{Var} 的定义} \\
+        &= \mathrm{Bias}^2 + \mathrm{Var}
+    \end{aligned}
+    \label{1a2}
+\end{equation}
+
+综合 \eqref{1a1} 和 \eqref{1a2}，我们得到：
+
+\begin{equation}
+    \et[\eyx[ (y - \fwt(\x))^2 ]] = \sigma^2 + \mathrm{Bias}^2 + \mathrm{Var} \qedhere
+\end{equation}
+
+\end{proof}
+
+\subsection{(b)}
+
+由 $\mathrm{Bias}^2$ 的定义 $\mathrm{Bias}^2 = \et[(\ft(\x) - \fb(\x))^2]$，由于平方项的存在，$\mathrm{Bias}^2 \ge 0$ 恒成立。
+
+当 $\ft \ne \fb$ 时，即模型的表示力不足以表达数据产生的规律时，$\mathrm{Bias}^2$ 永远大于 0，一个直观的例子就是，一条直线不能拟合不在同一直线上的 3 个点。
+
+\subsection{(c)}
+
+\begin{itemize}
+    \item $\mathrm{Bias}^2$ 只与我们建立的数学模型能否表示数据真实产生的机制有关，与 $N$ 和 $n$ 并无直接关联；但是若采取题目中 $\fb$ 的定义，$\mathrm{Bias}^2$ 与 $n$ 的关系是：随着 $n$ 的增大逐渐向下趋于一个定值，这个定值与模型的表示力和 $N$ 的大小有关；
+    \item $\mathrm{Var} = \mathcal O(\frac{1}{N})$
+\end{itemize}
+
+模型越复杂，$\mathrm{Bias}^2$ 越低，$\mathrm{Var}$ 越高；反之亦然。
+
+\section{第二题}
+
+\subsection{(a)}
+
+\newcommand{\err}{\operatorname{err}}
+
+\begin{proof}
+
+根据 Hoeffding 不等式，对于独立有界随机变量 \(Z_i \in [a, b]\)，有：
+
+\begin{equation}
+    \Pr \left[ \left| \frac{1}{n} \sum_{i=1}^n Z_i - \mathbb{E}[Z_i] \right| > \epsilon \right] \leq 2 \exp \left( -\frac{2n\epsilon^2}{(b-a)^2} \right)
+\label{hoeffding}
+\end{equation}
+
+取 $Z_i = I(h(x_i) \ne y_i)$，由定义，它是一个有界随机变量，$Z_i\in [0, 1]$。将 $a=0,b=1$ 带入 \eqref{hoeffding} 得：
+
+\begin{equation}
+    \Pr \left[ \left| \frac{1}{n} \sum_{i=1}^n Z_i - \mathbb{E}[Z_i] \right| > \epsilon \right] \leq 2 \exp (-2n\epsilon^2)
+\end{equation}
+
+而由 $Z_i$ 定义，经验误差 \(\err_S(h) = \frac{1}{n} \sum_{i=1}^n Z_i\)，期望误差 \(\err_D(h) = \mathbb{E}[Z_i]\)，则：
+
+\begin{equation}
+    \Pr[(\err_S(h) - \err_D(h)) > \epsilon] \le 2\exp(-2n\epsilon^2) \qedhere
+\end{equation}
+
+\end{proof}
+
+\subsection{(b)}
+
+\begin{proof}
+
+\begin{equation}
+    \begin{aligned}
+        \Pr[\exists h \in H, (\err_S(h) - \err_D(h)) > \epsilon] &\le \sum_{h\in H} \Pr[(\err_S(h) - \err_D(h)) > \epsilon] \\
+        &\le |H| \cdot 2 \exp(-2n\epsilon^2) \\
+        &= 2|H|\exp(-2n\epsilon^2)
+    \end{aligned}
+    \label{22b}
+    \qedhere
+\end{equation}
+
+\end{proof}
+
+\subsection{(c)}
+
+我们的数据偏差与训练集大小 $n$，模型类的大小 $|H|$ 有关：
+
+\begin{itemize}
+    \item 训练集大小 $n$：由 \eqref{22b}，其他条件不变时，$h$ 的泛化性不好的概率随 $n$ 的增长指数下降。这说明 $n$ 的大小对模型的泛化性非常显著；
+    \item 模型类的大小 $|H|$：由于 $|H|$ 的大小随模型参数量的增加指数增长；由 \eqref{22b}，$h$ 泛化性不好的概率随模型类的大小线性增长，随模型参数量的增长指数增长。
+\end{itemize}
+
+这说明，训练参数量越大的模型，需要数据集大小也越多；如果认为 \eqref{22b} 给出的上界是一个紧的界，那么需要的数据集大小和参数量之间大概呈现出一个正比例关系。
+
+为了减缓数据偏差带来的影响，我们要根据拥有数据集的大小选择合适的模型大小和正则化参数。
+
+\end{document}
