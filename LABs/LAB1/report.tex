@@ -21,8 +21,13 @@
 \begin{itemize}
     \item 填写代码的空白，补全了 \verb|submission.py| 中线性回归和逻辑回归的代码；
     \item 测试线性回归时发现梯度爆炸，添加了 Weight Clipping 后训练成功，基本达到了解析解的水平（虽然训练步数太长，后续考虑进行规范化）；
-    \item 考虑到线性回归中 Weight Clipping 属于比较 Ad hoc 的策略，我对数据进行规范化处理，并移除了 Weight Clipping 的代码；
-
+    \item 考虑到线性回归中 Weight Clipping 属于比较 Ad hoc 的策略，我对输入数据进行规范化处理，并移除了 Weight Clipping 的代码；
+    \item 添加了 L1 和 L2 正则化的代码；
+    \item 增加了特征数量，构造了对数，倒数特征；
+    \item 发现之前写的解析解代码无法处理奇异矩阵，改用 \verb|np.linalg.pinv| 计算伪逆；
+    \item 增加了复合特征，即原来的特征两两相乘的结果作为新的特征；
+    \item 发现有些标准差为 0 的特征，规范化时会导致除 0 错误，添加了对标准差过小的特征不进行规范化的处理；
+    \item 测试了逻辑回归的效果。
 \end{itemize}
 
 \subsection{超参数的调整}
