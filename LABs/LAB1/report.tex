@@ -1,0 +1,44 @@
+\documentclass{ctexart}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{geometry}
+\geometry{a4paper, left=1in, right=1in, top=1in, bottom=1in}
+
+\title{《人工智能与机器学习基础》第一次实验报告}
+\author{PB24000150 李欣宸}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{实验经过}
+
+\subsection{实验过程}
+
+\begin{itemize}
+    \item 填写代码的空白，补全了 \verb|submission.py| 中线性回归和逻辑回归的代码；
+    \item 测试线性回归时发现梯度爆炸，添加了 Weight Clipping 后训练成功，基本达到了解析解的水平（虽然训练步数太长，后续考虑进行规范化）；
+    \item 考虑到线性回归中 Weight Clipping 属于比较 Ad hoc 的策略，我对数据进行规范化处理，并移除了 Weight Clipping 的代码；
+
+\end{itemize}
+
+\subsection{超参数的调整}
+
+\subsection{正则化处理}
+
+\subsection{其他改进方法}
+
+\section{实验结果}
+
+\subsection{思考与分析}
+
+\section{课程反馈}
+
+\subsection{时间消耗}
+
+% \subsection{对课程/实验/作业的建议}
+
+\end{document}
