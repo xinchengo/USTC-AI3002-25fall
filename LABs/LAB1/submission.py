@@ -78,48 +78,6 @@ def load_and_preprocess_data(data_file: str = "data/train.csv"):
 
     dataset = extract_features_chatgpt(dataset)
 
-    """
-    # Multiply `KWI`, `VWM`, `VWN` by 4 to avoid log2 issues when =1
-    dataset[['KWI', 'VWM', 'VWN']] *= 4
-
-    # Construct LOG2 and INV features
-    idxs = ['MWG', 'NWG', 'KWG', 'MDIMC', 'NDIMC', 'MDIMA', 'NDIMB',
-            'KWI', 'VWM', 'VWN']
-    transformed_features = {}
-    idxs01 = ['STRM', 'STRN', 'SA', 'SB'] # features of [0, 1] range
-    for col in idxs:
-        transformed_features.update({#f'log2({col})': np.log2(dataset[col]),
-                                     f'inv({col})': 1.0 / dataset[col]})
-    dataset = pd.concat([dataset, pd.DataFrame(transformed_features, index=dataset.index)], axis=1)
-
-    # Construct composite features MUL(X,Y)
-    composite_idxs = idxs + idxs01 + list(transformed_features.keys())
-    mul_features = {}
-    for i, j in itertools.combinations(composite_idxs, 2):
-        mul_features[f'mul({i},{j})'] = dataset[i] * dataset[j]
-    for i, j, k in itertools.combinations(composite_idxs, 3):
-        mul_features[f'mul({i},{j},{k})'] = dataset[i] * dataset[j] * dataset[k]
-
-    dataset = pd.concat([dataset, pd.DataFrame(mul_features, index=dataset.index)], axis=1)
-
-    """
-
-    # idxs = list(dataset.columns)
-    # inv_features = {}
-    # for col in idxs:
-    #     inv_features.update({f'inv({col})': 1.0 / dataset[col]})
-    # dataset = pd.concat([dataset, pd.DataFrame(inv_features, index=dataset.index)], axis=1)
-    # Construct composite features MUL(X,Y)
-    # composite_idxs = list(dataset.columns)
-    # mul_features = {}
-    # for i, j in itertools.combinations(composite_idxs, 2):
-    #     mul_features[f'mul({i},{j})'] = dataset[i] * dataset[j]
-    # dataset = pd.concat([dataset, pd.DataFrame(mul_features, index=dataset.index)], axis=1)
-
-    # doge = dataset.to_numpy()
-    # # export doge to npz
-    # np.savez_compressed("doge_features.npz", doge=doge, targets=targets)
-
     # Normalize the dataset
     # We assume that the first call of this function is for training set
     global means, stds
@@ -129,25 +87,7 @@ def load_and_preprocess_data(data_file: str = "data/train.csv"):
         stds = np.where(stds < 1e-10, 1.0, stds)
     dataset = (dataset - means) / stds
 
-    # print(dataset.mean())
-    # print(dataset.std())
-
     features = dataset.to_numpy()
-
-
-    # indices = np.random.permutation(len(targets))
-    # features = features[indices]
-    # targets = targets[indices]
-    # np.random.shuffle(features)
-
-    # # SVD decomposition
-    # global svd_u, svd_s, svd_vt
-    # if svd_u is None or svd_s is None or svd_vt is None:
-    #     u, s, vt = np.linalg.svd(features[:5000], full_matrices=False)
-    #     svd_u, svd_s, svd_vt = u, s, vt
-    # # Top 200 components
-    # k = 300
-    # features = features @ svd_vt.T[:, :k]
 
     print(f"Data size: {features.shape[0]}. Features num: {features.shape[1]}")
     return features, targets
@@ -310,8 +250,6 @@ def linear_regression_analytic(X, y):
     coef = np.linalg.pinv(X_aug.T @ X_aug) @ X_aug.T @ y  # shape [d+1, 1]
     bias = coef[0].reshape(1, 1)
     weight = coef[1:]
-    # Export weight and bias to .npz
-    np.savez_compressed("linear_regression.npz", weight=weight, bias=bias)
     return weight, bias
 
 class LogisticRegressionModel(LinearModel):
