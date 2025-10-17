@@ -20,92 +20,43 @@ def extract_features_chatgpt(df: pd.DataFrame) -> pd.DataFrame:
     X = pd.DataFrame(index=df.index)
 
     # Raw logs of power-of-two parameters (helps linear models)
+    log2_orig = []
     for col in ['MWG','NWG','KWG','MDIMC','NDIMC','MDIMA','NDIMB','KWI','VWM','VWN']:
         X[f'log2_{col}'] = np.log2(df[col])
+        log2_orig.append(f'log2_{col}')
+        
+    X['vec_m'] = df['VWM'] # [1, 8]
+    X['vec_n'] = df['VWN'] # [1, 8]
+    X['stride_M'] = df['STRM'] # {0, 1}
+    X['stride_N'] = df['STRN'] # {0, 1}
+    X['SA'] = df['SA'] # {0, 1}
+    X['SB'] = df['SB'] # {0, 1}
 
     # Workgroup/thread geometry
-    X['wg_threads'] = df['MDIMC'] * df['NDIMC']               # threads per workgroup
-    # X['wg_threads_inv'] = 1 / X['wg_threads']          # avoid div0 as MDIMC,NDIMC >=1
-    # X['warp_count'] = X['wg_threads'] / 32.0                  # warps per workgroup
-    # X['occup_ge512'] = (X['wg_threads'] >= 512).astype(int)   # coarse occupancy indicator
-    # X['occup_eq1024'] = (X['wg_threads'] == 1024).astype(int) # max threads per WG
-    # X.drop(columns=['wg_threads'], inplace=True)
+    X['wg_threads'] = df['MDIMC'] * df['NDIMC']  # threads per workgroup [64, 1024]
 
     # Macro tile metrics
-    X['macro_tile_area'] = df['MWG'] * df['NWG']
+    X['macro_tile_area'] = df['MWG'] * df['NWG'] # [256, 16384]
     X['macro_per_thread'] = X['macro_tile_area'] / X['wg_threads']  # outputs per thread (approx)
     # X.drop(columns=['macro_tile_area'], inplace=True)
 
     # Per-thread work estimate along M/N (vector widths amplify per-thread output)
-    m_per_thread = df['MWG'] / df['MDIMC']
-    n_per_thread = df['NWG'] / df['NDIMC']
-    # X['per_thread_m'] = m_per_thread
-    # X['per_thread_n'] = n_per_thread
+    m_per_thread = df['MWG'] / df['MDIMC'] # [0.5, 8]
+    n_per_thread = df['NWG'] / df['NDIMC'] # [0.5, 8]
     X['per_thread_out'] = m_per_thread * n_per_thread * df['VWM'] * df['VWN']
     X['per_thread_mn'] = m_per_thread * n_per_thread
 
-    # X['per_thread_mninv'] = 1 / X['per_thread_mn']  # avoid div0 as MWG,NWG >=32
-
-    # Arithmetic intensity proxy (reuse improves when caching enabled)
-    # Base: (MWG*NWG)/(MWG+NWG) ~ larger tiles improve compute/byte ratio
-    ai_base = (df['MWG'] * df['NWG']) / (df['MWG'] + df['NWG'])
-    # X['ai_base'] = ai_base
-    # X['log2_ai_base'] = np.log2(ai_base + 1e-6)  # avoid log2(0)
-    # X['ai_with_SA'] = ai_base * df['SA']
-    # X['ai_with_SB'] = ai_base * df['SB']
-    # X['ai_with_both'] = ai_base * (df['SA'] & df['SB'])
-
-    # Vectorization effects
-    X['vec_m'] = df['VWM']
-    X['vec_n'] = df['VWN']
-    X['vec_total'] = df['VWM'] * df['VWN']
-    # X['vec_total_inv'] = 1 / X['vec_total']  # avoid div0 as VWM,VWN >=1
-    # X['vec_ge4_m'] = (df['VWM'] >= 4).astype(int)   # 128-bit loads/stores
-    # X['vec_ge4_n'] = (df['VWN'] >= 4).astype(int)
-
-    # Alignment/coalescing indicators
-    # X['align_m_threads'] = ((df['MWG'] % df['MDIMC']) == 0).astype(int)
-    # X['align_n_threads'] = ((df['NWG'] % df['NDIMC']) == 0).astype(int)
-    # X['align_m_vec'] = ((df['MWG'] % df['VWM']) == 0).astype(int)
-    # X['align_n_vec'] = ((df['NWG'] % df['VWN']) == 0).astype(int)
-
-    # Stride penalties (hurt coalescing)
-    X['stride_M'] = df['STRM']
-    X['stride_N'] = df['STRN']
-    # X['stride_any'] = np.maximum(df['STRM'], df['STRN'])
-
-    # K-dimension tiling & unrolling
-    # X['KWG'] = df['KWG']  # keep raw, but we already have log2_KWG
-    # X['KWI'] = df['KWI']  # keep raw, but we already have log2_KWI
-    # X['unroll_times_tileK'] = df['KWI'] * df['KWG']       # deeper unroll of a larger K-tile
-    # X['unroll_over_tileK'] = df['KWI'] / df['KWG']        # coarse register pressure proxy
-
-    # Shared/local memory tile shape (bank and footprint hints)
-    # X['shared_A_footprint'] = df['MDIMA'] * df['KWG']
-    # X['shared_B_footprint'] = df['NDIMB'] * df['KWG']
-    # X['shared_A_is32'] = (df['MDIMA'] == 32).astype(int)  # align with 32-bank SMEM
-    # X['shared_B_is32'] = (df['NDIMB'] == 32).astype(int)
-
     # Macro tile balance (square tiles often better)
-    X['mn_ratio'] = df['MWG'] / df['NWG']
-    X['nm_ratio'] = df['NWG'] / df['MWG']
-    # X['mnnm_ratio'] = (df['MWG'] / df['NWG'] + df['NWG'] / df['MWG'])
-    # X['mn_ratio_sqrt'] = np.sqrt(X['mn_ratio'])
-    # X['mn_diff'] = df['MWG'] - df['NWG']
+    X['mn_ratio'] = df['MWG'] / df['NWG'] # [-8, 8]
+    X['nm_ratio'] = df['NWG'] / df['MWG'] # [-8, 8]
 
-    # Cache flags (keep raw)
-    X['SA'] = df['SA']
-    X['SB'] = df['SB']
-
-    # X.drop(columns=['wg_threads'], inplace=True)
-
-    # Interaction: caching with vectorization (vector loads + cache typically good)
-    # X['cache_vec_m'] = df['SA'] * X['vec_ge4_m']
-    # X['cache_vec_n'] = df['SB'] * X['vec_ge4_n']
-
-    # Optional: mild nonlinearity via squared logs (use regularization to handle collinearity)
-    # for col in ['log2_MWG','log2_NWG','log2_KWG','log2_MDIMC','log2_NDIMC','log2_KWI','log2_VWM','log2_VWN']:
-    #     X[f'{col}_sq'] = X[col] ** 2
+    idx = X.columns
+    mul_features = {}
+    for i in range(len(idx)):
+        for j in range(i, len(idx)):
+            if {idx[i], idx[j]} != {'mn_ratio', 'nm_ratio'}:
+                mul_features[f'mul({idx[i]},{idx[j]})'] = X[idx[i]] * X[idx[j]]
+    X = pd.concat([X, pd.DataFrame(mul_features, index=X.index)], axis=1)
 
     return X
 
@@ -159,11 +110,15 @@ def load_and_preprocess_data(data_file: str = "data/train.csv"):
     #     inv_features.update({f'inv({col})': 1.0 / dataset[col]})
     # dataset = pd.concat([dataset, pd.DataFrame(inv_features, index=dataset.index)], axis=1)
     # Construct composite features MUL(X,Y)
-    composite_idxs = list(dataset.columns)
-    mul_features = {}
-    for i, j in itertools.combinations(composite_idxs, 2):
-        mul_features[f'mul({i},{j})'] = dataset[i] * dataset[j]
-    dataset = pd.concat([dataset, pd.DataFrame(mul_features, index=dataset.index)], axis=1)
+    # composite_idxs = list(dataset.columns)
+    # mul_features = {}
+    # for i, j in itertools.combinations(composite_idxs, 2):
+    #     mul_features[f'mul({i},{j})'] = dataset[i] * dataset[j]
+    # dataset = pd.concat([dataset, pd.DataFrame(mul_features, index=dataset.index)], axis=1)
+
+    # doge = dataset.to_numpy()
+    # # export doge to npz
+    # np.savez_compressed("doge_features.npz", doge=doge, targets=targets)
 
     # Normalize the dataset
     # We assume that the first call of this function is for training set
@@ -179,20 +134,27 @@ def load_and_preprocess_data(data_file: str = "data/train.csv"):
 
     features = dataset.to_numpy()
 
-    # SVD decomposition
-    global svd_u, svd_s, svd_vt
-    if svd_u is None or svd_s is None or svd_vt is None:
-        u, s, vt = np.linalg.svd(features, full_matrices=False)
-        svd_u, svd_s, svd_vt = u, s, vt
-    # Top 100 components
-    k = 100
-    features = features @ svd_vt.T[:, :k]
+
+    # indices = np.random.permutation(len(targets))
+    # features = features[indices]
+    # targets = targets[indices]
+    # np.random.shuffle(features)
+
+    # # SVD decomposition
+    # global svd_u, svd_s, svd_vt
+    # if svd_u is None or svd_s is None or svd_vt is None:
+    #     u, s, vt = np.linalg.svd(features[:5000], full_matrices=False)
+    #     svd_u, svd_s, svd_vt = u, s, vt
+    # # Top 200 components
+    # k = 300
+    # features = features @ svd_vt.T[:, :k]
 
     print(f"Data size: {features.shape[0]}. Features num: {features.shape[1]}")
     return features, targets
 
 class LinearRegressionModel(LinearModel):
-    def __init__(self, in_features: int, out_features: int, l1_lambda: float = 0.0, l2_lambda: float = 0.0):
+    def __init__(self, in_features: int, out_features: int, l1_lambda: float = 0.0, l2_lambda: float = 0,
+                 beta1 = 0.9, beta2 = 0.999, epsilon = 1e-8):
         """
         Linear regression model, inherits from LinearModel.
 
@@ -201,11 +163,24 @@ class LinearRegressionModel(LinearModel):
             out_features (int): Number of output features (usually 1).
             l1_lambda (float): L1 regularization coefficient.
             l2_lambda (float): L2 regularization coefficient.
+            beta1 (float): Exponential decay rate for first moment estimates in Adam.
+            beta2 (float): Exponential decay rate for second moment estimates in Adam.
+            epsilon (float): Small constant for numerical stability in Adam.
         """
         self.weight = np.random.randn(in_features, out_features) * 1e-6
         self.bias = np.zeros((1, out_features))
         self.l1_lambda = l1_lambda
         self.l2_lambda = l2_lambda
+        self.beta1 = beta1
+        self.beta2 = beta2
+        self.epsilon = epsilon
+        
+        # Adam optimizer parameters
+        self.t = 0
+        self.m_w = np.zeros((in_features, out_features)) 
+        self.v_w = np.zeros((in_features, out_features))
+        self.m_b = np.zeros((1, out_features))
+        self.v_b = np.zeros((1, out_features))
 
     def forward(self, features: np.ndarray) -> np.ndarray:
         """
@@ -268,8 +243,26 @@ class LinearRegressionModel(LinearModel):
         
         dw, db = self.gradient(features, targets, predictions)
 
-        self.weight -= learning_rate * dw
-        self.bias -= learning_rate * db
+        # Adam optimizer
+        beta1, beta2, epsilon = self.beta1, self.beta2, self.epsilon
+        self.t += 1
+
+        # Update moment estimates
+        self.m_w = beta1 * self.m_w + (1 - beta1) * dw
+        self.m_b = beta1 * self.m_b + (1 - beta1) * db
+        self.v_w = beta2 * self.v_w + (1 - beta2) * (dw ** 2)
+        self.v_b = beta2 * self.v_b + (1 - beta2) * (db ** 2)
+        
+        # Bias correction
+        m_w_hat = self.m_w / (1 - beta1 ** self.t)
+        m_b_hat = self.m_b / (1 - beta1 ** self.t)
+        v_w_hat = self.v_w / (1 - beta2 ** self.t)
+        v_b_hat = self.v_b / (1 - beta2 ** self.t)
+        
+        # Update parameters
+        self.weight -= learning_rate * m_w_hat / (np.sqrt(v_w_hat) + epsilon)
+        self.bias -= learning_rate * m_b_hat / (np.sqrt(v_b_hat) + epsilon)
+        
         # print(f"Weight norm: {np.linalg.norm(self.weight)}, Bias norm: {np.linalg.norm(self.bias)}")
         return loss
 
@@ -278,7 +271,7 @@ class LinearRegressionTrainer(Trainer):
                  save_dir=None, learning_rate=0.01, eval_strategy="epoch", 
                  eval_steps=100, num_epochs=10, eval_metric="mae"):
         super().__init__(model, train_dataloader, eval_dataloader, save_dir, 
-                         learning_rate*0+0.01, eval_strategy, eval_steps, num_epochs*0+10, eval_metric)
+                         learning_rate*0+0.05, eval_strategy, eval_steps, num_epochs*0+50, eval_metric)
 
     def compute_loss(self, batch_pred, batch_grd):
         """
@@ -294,7 +287,8 @@ class LinearRegressionTrainer(Trainer):
         return np.mean((batch_pred - batch_grd) ** 2)
     
     def learning_rate_scheduler(self):
-        # self.learning_rate = self.initial_learning_rate * (0.95 ** (self.cur_step // 50))
+        # self.learning_rate = self.initial_learning_rate * (0.5 ** (self.cur_step // 2000))
+        self.learning_rate = self.learning_rate * 0.9997
         return super().learning_rate_scheduler()
 
 def linear_regression_analytic(X, y):
@@ -316,19 +310,34 @@ def linear_regression_analytic(X, y):
     coef = np.linalg.pinv(X_aug.T @ X_aug) @ X_aug.T @ y  # shape [d+1, 1]
     bias = coef[0].reshape(1, 1)
     weight = coef[1:]
+    # Export weight and bias to .npz
+    np.savez_compressed("linear_regression.npz", weight=weight, bias=bias)
     return weight, bias
 
 class LogisticRegressionModel(LinearModel):
-    def __init__(self, in_features: int, out_features: int):
+    def __init__(self, in_features: int, out_features: int, beta1 = 0.9, beta2 = 0.999, epsilon = 1e-8):
         """
         Logistic regression model, inherits from LinearModel.
 
         Args:
             in_features (int): Number of input features.
             out_features (int): Number of output features (usually 1 for binary classification).
+            beta1 (float): Exponential decay rate for first moment estimates in Adam.
+            beta2 (float): Exponential decay rate for second moment estimates in Adam.
+            epsilon (float): Small constant for numerical stability in Adam.
         """
         self.weight = np.random.randn(in_features, out_features) * 1e-2
         self.bias = np.zeros((1, out_features))
+        self.beta1 = beta1
+        self.beta2 = beta2
+        self.epsilon = epsilon
+        
+        # Adam optimizer parameters
+        self.t = 0
+        self.m_w = np.zeros((in_features, out_features))
+        self.v_w = np.zeros((in_features, out_features))
+        self.m_b = np.zeros((1, out_features))  
+        self.v_b = np.zeros((1, out_features))  
 
     def _sigmoid(self, x: np.ndarray) -> np.ndarray:
         """
@@ -382,12 +391,31 @@ class LogisticRegressionModel(LinearModel):
             float: Binary cross-entropy loss for the batch.
         """
         m = float(features.shape[0])  # Batch size
-        epsilon = 1e-15  # To avoid log(0)
-        predictions = np.clip(predictions, epsilon, 1 - epsilon)
+        eps = 1e-15  # To avoid log(0)
+        predictions = np.clip(predictions, eps, 1 - eps)
         loss = - (1/m) * np.sum(targets * np.log(predictions) + (1 - targets) * np.log(1 - predictions))
         dw, db = self.gradient(features, targets, predictions)
-        self.weight -= learning_rate * dw
-        self.bias -= learning_rate * db
+        
+        # Adam optimizer
+        beta1, beta2, epsilon = self.beta1, self.beta2, self.epsilon
+        self.t += 1
+        
+        # Update moment estimates
+        self.m_w = beta1 * self.m_w + (1 - beta1) * dw
+        self.m_b = beta1 * self.m_b + (1 - beta1) * db
+        self.v_w = beta2 * self.v_w + (1 - beta2) * (dw ** 2)
+        self.v_b = beta2 * self.v_b + (1 - beta2) * (db ** 2)
+        
+        # Bias correction
+        m_w_hat = self.m_w / (1 - beta1 ** self.t)
+        m_b_hat = self.m_b / (1 - beta1 ** self.t)
+        v_w_hat = self.v_w / (1 - beta2 ** self.t)
+        v_b_hat = self.v_b / (1 - beta2 ** self.t)
+        
+        # Update parameters
+        self.weight -= learning_rate * m_w_hat / (np.sqrt(v_w_hat) + epsilon)
+        self.bias -= learning_rate * m_b_hat / (np.sqrt(v_b_hat) + epsilon)
+        
         return loss
         
 class LogisticRegressionTrainer(Trainer):
@@ -395,7 +423,7 @@ class LogisticRegressionTrainer(Trainer):
                  save_dir=None, learning_rate=0.01, eval_strategy="epoch", 
                  eval_steps=100, num_epochs=10, eval_metric="f1"):
         super().__init__(model, train_dataloader, eval_dataloader, save_dir, 
-                         learning_rate, eval_strategy, eval_steps, num_epochs, eval_metric)
+                         learning_rate*0+0.002, eval_strategy, eval_steps, num_epochs*0+200, eval_metric)
         
     def compute_loss(self, batch_pred, batch_grd):
         m = float(batch_grd.shape[0])  # Batch size

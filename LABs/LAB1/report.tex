@@ -5,6 +5,7 @@
 \usepackage{amsthm}
 \usepackage{geometry}
 \geometry{a4paper, left=1in, right=1in, top=1in, bottom=1in}
+\usepackage{minted}
 
 \title{《人工智能与机器学习基础》第一次实验报告}
 \author{PB24000150 李欣宸}
@@ -18,7 +19,7 @@
 
 \subsection{实验过程}
 
-\begin{itemize}
+\begin{enumerate}
     \item 填写代码的空白，补全了 \verb|submission.py| 中线性回归和逻辑回归的代码；
     \item 测试线性回归时发现梯度爆炸，添加了 Weight Clipping 后训练成功，基本达到了解析解的水平（虽然训练步数太长，后续考虑进行规范化）；
     \item 考虑到线性回归中 Weight Clipping 属于比较 Ad hoc 的策略，我对输入数据进行规范化处理，并移除了 Weight Clipping 的代码；
@@ -27,12 +28,36 @@
     \item 发现之前写的解析解代码无法处理奇异矩阵，改用 \verb|np.linalg.pinv| 计算伪逆；
     \item 增加了复合特征，即原来的特征两两相乘的结果作为新的特征；
     \item 发现有些标准差为 0 的特征，规范化时会导致除 0 错误，添加了对标准差过小的特征不进行规范化的处理；
-    \item 测试了逻辑回归的效果。
-\end{itemize}
+    \item 测试了逻辑回归的效果；
+    \item 使用 ChatGPT 构造了一些有实际意义的特征，在这些特征的基础上做了一定的删减，得到了能得到良好解析解的一组特征；
+    \item 尝试让梯度下降的解尽可能接近解析解；
+    \item 书写了 Adam 优化器，并调整了相应的学习率。
+\end{enumerate}
 
 \subsection{超参数的调整}
 
+在实验过程中，我主要调整了以下超参数：
+\begin{itemize}
+    \item 学习率：对于线性回归，使用指数学习率规划器，初始学习率设置为 $0.05$，每次迭代后乘以 $0.9997$；对于逻辑回归，使用固定学习率 $0.002$；
+    
+    我对线性回归超参数的调节过程是这样的：首先没有学习率规划器，我选择的是能让训练保持稳定、收敛的最大的学习率；之后我发现损失函数在后期会有较大的振荡，因此我添加了学习率规划器，让学习率逐渐减小，从而减小振荡；
+
+    对于逻辑回归，我选择了一个振荡比较小，不是过于明显的学习率；
+
+    \item 训练周期数：由于没有发生明显的过拟合现象，所以训练周期越多，拟合越好，因此线性回归的训练周期数设置为 $50$，逻辑回归的训练周期数设置为 $200$；
+    
+    \item 正则化系数：由于并没有明显的过拟合现象，因此 L1 和 L2 正则化系数设置为 $0$；
+    \item 
+    \item Adam 优化器的 $\beta_1,~\beta_2$：采用比较常见的 $\beta_1=0.9,~\beta_2=0.999$；
+    
+    由于在实验中，我对这两个参数进行调整对结果没有产生任何可观的影响，因此，我最终选择了比较常见的参数。
+\end{itemize}
+
 \subsection{正则化处理}
+
+我编写了 L1 和 L2 正则化处理，但是经过测试，即使当特征数量达到 $10^3$ 量级，仍然不会观察到明显的的过拟合现象；使用正则化后，训练集和验证集的训练效果都变差。
+
+这可能是数据集本身规模较大（约 $1.3\times 10^5$ 个训练样本）导致的，因此，在最终的实验中并没有使用正则化处理。
 
 \subsection{其他改进方法}
 
@@ -46,14 +71,101 @@
 
 特征工程是我在该实验中所做的主要改进方法，包括对特征进行变换和构造复合特征。
 
+我想到特征工程的主要原因是，原有的 $14$ 个特征只有 $2$ 的次幂或者是 $0/1$ 的离散值，与运行时间没有简单的线性关系，因此需要对特征采取对数、倒数等变换；且，GPU 上真实的运行时间是各个参数之间互相影响的结果，简单地使用单个特征及其变换无法反映不同参数之间的相互影响，因此可以对特征之间进行乘积等操作，构造新的“复合特征”。
+
+主要的思路是：
+\begin{itemize}
+    \item 先对原有的 2 次幂的特征进行对数处理；
+    \item 再根据数据集的特点，构造一些有用的特征；
+    \item 之后再对这些特征构造 2 阶多项式，即构造每个特征的平方和特征间两两相乘的结果作为新的特征；
+\end{itemize}
+
+由于 ChatGPT 对 GPU 计算加速有一定的知识，我先使用 ChatGPT 构造了 30 个左右的特征，之后对这些特征进行了删减，删减后除了各个 2 次幂特征的对数及原有特征还有以下的特征：
+
+\begin{itemize}
+    \item \verb|wg_threads|：表示工作组中线程的数量。它是 \verb|MDIMC|（本地工作组在 M 维度的大小）和 verb|NDIMC|（本地工作组在 N 维度的大小）的乘积；
+    \item \verb|macro_tile_area|、\verb|macro_per_thread|：提取与宏瓦片大小及其在线程中的分布相关的特征；
+    \item \verb|per_thread_out|、\verb|per_thread_mn|：反映每线程工作量；
+    \item \verb|mn_ratio|、\verb|nm_ratio|：表示宏瓦片在 M 和 N 维度上的长宽比；GPU 上通常正方形的瓦片会更高效，因此这些比例可能有助于理解工作负载的平衡；
+\end{itemize}
+
+这些累计 $23$ 个特征已经可以使得 $R^2$ 达到 $0.7$ 以上。
+
+接下来，我们在这些特征的基础上，构造了每个特征的平方和特征间两两相乘的结果作为新的特征，共 $298$ 个，最终解析解的 $R^2$ 能达到 $0.94$；但是，由于尚不明确的原因，梯度下降的结果并不能很好地接近解析解，在使用普通梯度下降优化器时只能达到 $0.85$ 左右，在使用 Adam 优化器时只能达到 $0.91$ 左右。
+
+\subsection{优化器的调整}
+
+由于使用普通梯度下降优化器时，无法使得梯度下降的结果很好地接近解析解，因此我尝试使用 Adam 优化器进行训练。
+
+我想到 Adam 优化器的主要思路是：随机梯度下降优化器对于参数之间相关性较弱，量级相当的情况效果较好，但对于高维，每个维度量级差异较大的情况，往往表现较差。
+
+而对于这个运行时间预测问题，我构造特征的方式属于“广撒网”，特征之间相关性较强，量级差异较大；有些维度与结果关联比较大，而有些维度与结果几乎没有关联，且存在随机噪声。另外很多特征的边缘分布类似长尾分布。所以，这是收敛结果较差的一个很好的理由。
+
+Adam 优化器根据近期梯度的一阶矩、二阶矩信息，自适应地调整每个参数的学习率，比较适合处理高维，每个维度差异较大的情况。采用 Adam 优化器后，$R^2$ 能够达到 $0.91$ 左右，虽然离解析解的 $0.94$ 还有一定的距离。
+
 \section{实验结果}
 
-\subsection{思考与分析}
+\subsection{线性回归结果}
+
+下面是使用命令 \mintinline{bash}{python train.py --mode regression}\footnote{学习率、运行步数已经写死在 \texttt{submission.py} 中，通过传参进行调整对运行结果没有影响} 得到的结果：
+
+\begin{verbatim}
+    ********** Finish training! **********
+    Evaluation results on your eval set: mae: 0.21, R2: 0.91
+    ********** The results using analytic solution on eval set **********
+    Evaluation results on your eval set: mae: 0.17, R2: 0.94
+\end{verbatim}
+
+可以看到，使用梯度下降优化器得到的 $R^2=0.91$，而使用解析解得到的 $R^2=0.94$。虽然它们已经很接近，但还是有明显的差距。这可能与特征之间的关系较为复杂，矩阵较为病态有关。
+
+该模型使用了 $299$ 个参数（$298$ 个系数+$1$ 个偏置）；由于有同学在更高参数量的模型上可以得到 $R^2=0.97$ 的理论值且不发生过拟合，$R^2$ 达到 $0.94$ 是一个不错的结果，但没有达到上限。
+
+损失函数曲线如图 \ref{fig:regression_loss_curve}：
+
+\begin{figure}[t]
+\includegraphics[width=0.48\textwidth]{imgs/train_loss_curve_regression.png}
+\includegraphics[width=0.48\textwidth]{imgs/eval_loss_curve_regression.png}
+\caption{线性回归训练集和验证集损失函数曲线}
+\label{fig:regression_loss_curve}
+\end{figure}
+
+由曲线可知，学习率的设置总体合适，且学习率规划器起到了作用，损失函数在后边段的振荡有所减小。
+
+\subsection{逻辑回归结果}
+
+下面是使用命令 \mintinline{bash}{python train.py --mode classification} 得到的结果：
+
+\begin{verbatim}
+    ********** Finish training! **********
+    Evaluation results on your eval set: F1: 0.94, AUC: 0.99
+\end{verbatim}
+
+该模型的结构与线性回归实验相同，损失函数曲线如图 \ref{fig:classification_loss_curve}：
+
+\begin{figure}[t]
+    \includegraphics[width=0.48\textwidth]{imgs/train_loss_curve_classification.png}
+    \includegraphics[width=0.48\textwidth]{imgs/eval_loss_curve_classification.png}
+    \caption{逻辑回归训练集和验证集损失函数曲线}
+    \label{fig:classification_loss_curve}
+\end{figure}
+
+在曲线中可以看到，该模型损失函数的抖动比线性回归更明显，这是因为逻辑回归的标签只有真假二值，本身就不如线性函数的目标函数平滑。该函数仍然有下降趋势，预示着可能随着训练步数的增加，这个模型的效果还会有较小的提升。
 
 \section{课程反馈}
 
 \subsection{时间消耗}
 
-% \subsection{对课程/实验/作业的建议}
+我在 VSCode 编辑器中安装了 WakaTime 插件，它可以较好地统计编程时间。WakaTime 会排除我打开了 IDE 但实际上在摸鱼的时间。 WakaTime 的统计截图见图 \ref{fig:wakatime_lab1}：
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.9\textwidth]{imgs/wakatime_lab1.png}
+    \caption{WakaTime 统计的实验时间消耗}
+    \label{fig:wakatime_lab1}
+\end{figure}
+
+\subsection{对课程和实验的建议}
+
+建议对实验设置一个及格分，达到分数以后实验才有效；建议每隔一段时间公布前 $10\%,~40\%$ 的实验效果，为同学们付出时间提供参考。
 
 \end{document}
