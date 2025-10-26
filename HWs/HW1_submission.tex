@@ -2,6 +2,7 @@
 \usepackage{graphicx} % Required for inserting images
 \usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{siunitx}
 \usepackage{amsthm}
 \usepackage{geometry}
 \geometry{a4paper, left=1in, right=1in, top=1in, bottom=1in}
@@ -131,5 +132,129 @@
 这说明，训练参数量越大的模型，需要数据集大小也越多；如果认为 \eqref{22b} 给出的上界是一个紧的界，那么需要的数据集大小和参数量之间大概呈现出一个正比例关系。
 
 为了减缓数据偏差带来的影响，我们要根据拥有数据集的大小选择合适的模型大小和正则化参数。
+
+\section{第三题}
+
+\subsection{(a)}
+
+\begin{align}
+\mathcal L(\mu^1, \mu^2, \Sigma) &= \prod_{i=1}^{n_1} p(x_i^1 | y_1) \prod_{i=1}^{n_2} p(x_i^2 | y_2) \nonumber \\
+\implies \ln \mathcal L &= \sum_{i=1}^{n_1} \ln p(x_i^1 | y_1) + \sum_{i=1}^{n_2} \ln p(x_i^2 | y_2) \nonumber \\
+&= -\frac{n_1 + n_2}{2} \ln 2\pi - \frac{n_1 + n_2}{2} \ln |\Sigma| \nonumber \\
+&\quad -\frac{1}{2} \sum_{i=1}^{n_1} (x_i^1 - \mu^1)^T \Sigma^{-1} (x_i^1 - \mu^1) -\frac{1}{2} \sum_{i=1}^{n_2} (x_i^2 - \mu^2)^T \Sigma^{-1} (x_i^2 - \mu^2) \\
+\text{由于} \arg &\max \mathcal L = \arg \max \ln \mathcal L, \text{ 我们要最大化 } \ln \mathcal L\text{，则：} \nonumber \\
+\frac{\partial \ln \mathcal L}{\partial \mu^1} &= -\frac{1}{2} \sum_{i=1}^{n_1} \frac{\partial (x_i^1 - \mu^1)^T\Sigma^{-1} (x_i^1 - \mu^1)}{\partial \mu^1}  \nonumber \\
+&= -\frac{1}{2}\sum_{i=1}^{n_1} -2 \Sigma^{-1} (x_i^1 - \mu^1) \nonumber \\
+&= \sum_{i=1}^{n_1} \Sigma^{-1} (x_i^1 - \mu^1) = 0 \nonumber \\
+\implies \quad \mu^1 &= \frac{1}{n_1} \sum_{i=1}^{n_1} x_i^1 \nonumber \\
+\text{同理, } \mu^2 &= \frac{1}{n_2} \sum_{i=1}^{n_2} x_i^2 \quad \nonumber \\
+\frac{\partial \ln \mathcal L}{\partial \Sigma} &= -\frac{n_1 + n_2}{2} \frac{\partial \ln |\Sigma|}{\partial \Sigma} - \frac{1}{2} \sum_{i=1}^{n_1} \frac{\partial (x_i^1 - \mu^1)^T \Sigma^{-1} (x_i^1 - \mu^1)}{\partial \Sigma} \nonumber \\
+&= -\frac{1}{2} \sum_{i=1}^{n_2} \frac{\partial (x_i^2 - \mu^2)^T \Sigma^{-1} (x_i^2 - \mu^2)}{\partial \Sigma} \nonumber \\
+&= -\frac{n_1 + n_2}{2} \Sigma^{-1} + \frac{1}{2} \sum_{i=1}^{n_1} \Sigma^{-1} (x_i^1 - \mu^1) (x_i^1 - \mu^1)^T \Sigma^{-1} \nonumber \\
+&\quad + \frac{1}{2} \sum_{i=1}^{n_2} \Sigma^{-1} (x_i^2 - \mu^2) (x_i^2 - \mu^2)^T \Sigma^{-1} \nonumber \\
+&= \frac{1}{2} \Sigma^{-1} \left( -(n_1 + n_2) \Sigma + \sum_{i=1}^{n_1} (x_i^1 - \mu^1) (x_i^1 - \mu^1)^T + \sum_{i=1}^{n_2} (x_i^2 - \mu^2) (x_i^2 - \mu^2)^T \right) \Sigma^{-1} = 0 \nonumber \\
+\implies \quad \Sigma &= \frac{1}{n_1 + n_2} \left( \sum_{i=1}^{n_1} (x_i^1 - \mu^1) (x_i^1 - \mu^1)^T + \sum_{i=1}^{n_2} (x_i^2 - \mu^2) (x_i^2 - \mu^2)^T \right) \nonumber \\
+\text{综上，显式}&\text{解为：} \nonumber \\
+\mu^1 &= \frac{1}{n_1} \sum_{i=1}^{n_1} x_i^1, \quad \mu^2 = \frac{1}{n_2} \sum_{i=1}^{n_2} x_i^2,  \label{mu} \\
+\Sigma &= \frac{1}{n_1 + n_2} \left( \sum_{i=1}^{n_1} (x_i^1 - \mu^1) (x_i^1 - \mu^1)^T + \sum_{i=1}^{n_2} (x_i^2 - \mu^2) (x_i^2 - \mu^2)^T \label{Sigma} \right)
+\end{align}
+
+\subsection{(b)}
+
+考虑将所有的数据堆叠成批，可以得到输入矩阵：
+
+\begin{gather}
+X^1 = \begin{pmatrix}
+2.0 & 2.5 & 3.0 & 2.2 & 2.8 \\
+2.5 & 2.8 & 2.7 & 3.0 & 2.6 \\
+2.0 & 2.2 & 2.5 & 2.3 & 2.4
+\end{pmatrix}, \quad
+X^2 = 
+\begin{pmatrix}
+3.5 & 3.2 & 3.8 & 3.0 & 4.0 \\
+3.8 & 4.0 & 3.5 & 3.9 & 3.6 \\
+3.2 & 3.5 & 3.7 & 3.3 & 3.9
+\end{pmatrix} 
+\end{gather}
+
+带入 \eqref{mu},\eqref{Sigma} 可得：
+
+\begin{gather}
+\mu^1 = \begin{pmatrix}
+2.5 \\
+2.72 \\
+2.28
+\end{pmatrix}, \quad
+\mu^2 =
+\begin{pmatrix}
+3.5 \\
+3.76 \\
+3.52
+\end{pmatrix}, \quad
+\Sigma = \begin{pmatrix}
+0.136  & -0.032  &  0.064 \\
+-0.032 &  0.032  & -0.0114 \\
+0.064  & -0.0114 &  0.0476
+\end{pmatrix}
+\end{gather}
+
+由于 $x|y_i \sim \mathcal N(\mu^i, \Sigma),~i=1,2$，则有：
+
+\begin{equation}
+\begin{aligned}
+p(x|y_1) &= \frac{1}{(2\pi)^{3/2} |\Sigma|^{1/2}} \exp \left\{ -\frac{1}{2} (x - \mu^1)^T \Sigma^{-1} (x - \mu^1) \right\} \\
+p(x|y_2) &= \frac{1}{(2\pi)^{3/2} |\Sigma|^{1/2}} \exp \left\{ -\frac{1}{2} (x - \mu^2)^T \Sigma^{-1} (x - \mu^2) \right\}
+\end{aligned}
+\end{equation}
+
+代入 $x = \begin{pmatrix}2.7&2.9&3.5\end{pmatrix}^T$，可得 $p(x|y_1) = \num{1.3115e-15},~p(x|y_2) = \num{5.9952e-14}$，由于输入数据中两个分类类别各半，取 $p(y_1) = p(y_2) = 0.5$，则由 Bayes 公式可得：
+
+\begin{align}
+p(y_1|x) &= \frac{p(x|y_1)p(y_1)}{p(x|y_1)p(y_1) + p(x|y_2)p(y_2)} \approx 0.0214 = \SI{2.14}{\percent} \\
+p(y_2|x) &= \frac{p(x|y_2)p(y_2)}{p(x|y_1)p(y_1) + p(x|y_2)p(y_2)} \approx 0.9786 = \SI{97.86}{\percent} \label{py2x}
+\end{align}
+
+由 \eqref{py2x} 可知，该样本更有可能属于类别 $y_2$（即标签 1），概率为约 \SI{97.86}{\percent}。
+
+\subsection{(c)}
+
+\begin{equation}
+\begin{aligned}
+z &= \ln \frac{p(x|y_1)p(y_1)}{p(x|y_2)p(y_2)} \\
+&= \ln \frac{n_1}{n_2} + \ln \frac{\exp \left\{ -\frac{1}{2} (x - \mu^1)^T \Sigma^{-1} (x - \mu^1) \right\}}{\exp \left\{ -\frac{1}{2} (x - \mu^2)^T \Sigma^{-1} (x - \mu^2) \right\}} \\
+&= \ln \frac{n_1}{n_2} - \frac{1}{2} \left( (x - \mu^1)^T \Sigma^{-1} (x - \mu^1) - (x - \mu^2)^T \Sigma^{-1} (x - \mu^2) \right) \\
+&= \ln \frac{n_1}{n_2} - \frac{1}{2} \left( x^T \Sigma^{-1} x - 2 (\mu^1)^T \Sigma^{-1} x + (\mu^1)^T \Sigma^{-1} \mu^1 - x^T \Sigma^{-1} x + 2 (\mu^2)^T \Sigma^{-1} x - (\mu^2)^T \Sigma^{-1} \mu^2 \right) \\
+&= \left( (\mu^1 - \mu^2)^T \Sigma^{-1} \right) x + \frac{1}{2} \left( (\mu^2)^T \Sigma^{-1} \mu^2 - (\mu^1)^T \Sigma^{-1} \mu^1 \right) + \ln \frac{n_1}{n_2} \label{z}
+\end{aligned}
+\end{equation}
+
+观察到 \eqref{z} 符合 $z = w \cdot x + b$ 的形式，其中：
+
+\begin{equation}
+\begin{aligned}
+w &= (\mu^1 - \mu^2)^T \Sigma^{-1} \\
+b &= \frac{1}{2} \left( (\mu^2)^T \Sigma^{-1} \mu^2 - (\mu^1)^T \Sigma^{-1} \mu^1 \right) + \ln \frac{n_1}{n_2}
+\end{aligned}
+\end{equation}
+
+\section{第四题}
+
+\subsection{(a)}
+
+\begin{gather}
+x = \begin{pmatrix} 3 \\ 14 \end{pmatrix} \\
+a^1 = f^1(z) = \max\{0, (W^1)^T x + w^1_0\}  = \begin{pmatrix} 2 & 13 & 0 & 0 \end{pmatrix}^T \\
+a^2 = f^2(z) = \mathsf{Softmax}((W^2)^T a^1 + w^2_0) = \mathsf{Softmax}(\begin{pmatrix} 15 \\ -13\end{pmatrix}) \approx \begin{pmatrix} 1-\num{6.91e-13} \\ \num{6.91e-13} \end{pmatrix}
+\end{gather}
+
+\subsection{(b)}
+
+\begin{gather}
+X = \begin{pmatrix} 0.5 & 0 & -3 \\ 0.5 & 2 & 0.5 \end{pmatrix} \\
+f^1(Z^1) = \max\{0, (W^1)^T X + w^1_0\} = \begin{pmatrix} 0 & 0 & 0 \\ 0 & 1 & 0 \\ 0 & 0 & 2 \\ 0 & 0 & 0 \end{pmatrix} \\ 
+\end{gather}
+
+\subsection{(c)}
+
 
 \end{document}
