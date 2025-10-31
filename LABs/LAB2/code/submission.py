@@ -11,18 +11,18 @@ def data_preprocess(example: np.ndarray) -> np.ndarray:
     img_np = np.array(example["image"], dtype=np.uint8)
 
     # TODO: 1. 将图像扩展维度 (28,28) -> (1,28,28)
-    img_np_with_channel = None
+    img_np_with_channel = np.expand_dims(img_np_with_channel, axis=0)
     
     # TODO: 2. 将图像展平为一维数组 (28,28) -> (784,)
-    img_np_flat = None
-    
+    img_np_flat = img_np.flatten()
+
     # TODO: 3. 将处理后的数据添加到example字典中
-    # example["image2D"] = ...
-    # example["image1D"] = ...
+    example["image2D"] = img_np_with_channel
+    example["image1D"] = img_np_flat
 
     # TODO: 4.（可选）进行相关数据预处理，例如：归一化、标准化等
 
-    raise NotImplementedError("请完成data_preprocess函数")
+    # raise NotImplementedError("请完成data_preprocess函数")
     return example
 
 class PCA:
@@ -56,7 +56,18 @@ class PCA:
         X : np.ndarray of shape (N, D)
             Input data.
         """
-        raise NotImplementedError("完成 PCA.fit 方法")
+        # 居中数据
+        self.mean_ = np.mean(X, axis=0)
+        Xc = X - self.mean_
+        
+        U, S, VT = np.linalg.svd(Xc, full_matrices=False)
+        self.components_ = VT[:self.n_components]
+        
+        N = X.shape[0]
+        self.explained_variance_ = (S[:self.n_components] ** 2) / (N - 1)
+        total_variance = np.sum((S ** 2) / (N - 1))
+        self.explained_variance_ratio_ = self.explained_variance_ / total_variance
+        # raise NotImplementedError("完成 PCA.fit 方法")
         return self
 
     def transform(self, X: np.ndarray) -> np.ndarray:
