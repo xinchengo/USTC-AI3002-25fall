@@ -7,6 +7,8 @@
 \usepackage{geometry}
 \geometry{a4paper, left=1in, right=1in, top=1in, bottom=1in}
 
+\allowdisplaybreaks
+
 \title{《人工智能与机器学习基础》第一次作业}
 \author{PB24000150 李欣宸}
 \date{\today}
@@ -244,7 +246,7 @@ b &= \frac{1}{2} \left( (\mu^2)^T \Sigma^{-1} \mu^2 - (\mu^1)^T \Sigma^{-1} \mu^
 \begin{gather}
 x = \begin{pmatrix} 3 \\ 14 \end{pmatrix} \\
 a^1 = f^1(z) = \max\{0, (W^1)^T x + w^1_0\}  = \begin{pmatrix} 2 & 13 & 0 & 0 \end{pmatrix}^T \\
-a^2 = f^2(z) = \mathsf{Softmax}((W^2)^T a^1 + w^2_0) = \mathsf{Softmax}(\begin{pmatrix} 15 \\ -13\end{pmatrix}) \approx \begin{pmatrix} 1-\num{6.91e-13} \\ \num{6.91e-13} \end{pmatrix}
+a^2 = f^2(z) = \mathsf{Softmax}((W^2)^T a^1 + w^2_0) = \mathsf{Softmax}(\begin{pmatrix} 15 \\ -13\end{pmatrix}) = \begin{pmatrix}1-e^{-28}\\e^{-28}\end{pmatrix} \approx \begin{pmatrix} 1-\num{6.91e-13} \\ \num{6.91e-13} \end{pmatrix}
 \end{gather}
 
 \subsection{(b)}
@@ -256,5 +258,27 @@ f^1(Z^1) = \max\{0, (W^1)^T X + w^1_0\} = \begin{pmatrix} 0 & 0 & 0 \\ 0 & 1 & 0
 
 \subsection{(c)}
 
+先求梯度：
 
+\begin{gather}
+\frac{\partial \mathcal L}{\partial z^2} = \mathsf{Softmax}(z^2) - y = \begin{pmatrix} 1 - e^{-28} \\ e^{-28} - 1 \end{pmatrix} \approx \begin{pmatrix} 1 \\ -1 \end{pmatrix} \\
+\frac{\partial z^2}{\partial W^2} = a^1 
+\implies \frac{\partial \mathcal L}{\partial W^2} = a^1 \cdot \left( \mathsf{Softmax}(z^2) - y \right)^T = \begin{pmatrix} 2 & -2 \\ 13 & -13 \\ 0 & 0 \\ 0 & 0 \end{pmatrix} \\
+\frac{\partial z^2}{\partial w^2_0} = 1
+\implies \frac{\partial \mathcal L}{\partial w^2_0} = \frac{\partial \mathcal L}{\partial z^2} \cdot \frac{\partial z^2}{\partial w^2_0} = \begin{pmatrix} 1 \\ -1 \end{pmatrix} \\
+\frac{\partial z^2}{\partial a^1} = W^2
+\implies \frac{\partial \mathcal L}{\partial a^1} = \frac{\partial z^2}{\partial a^1} \cdot \frac{\partial \mathcal L}{\partial z^2} = \begin{pmatrix}1 & -1\\1 & -1 \\ 1 & -1 \\ 1 & -1\end{pmatrix} \begin{pmatrix} 1\\-1\end{pmatrix}=\begin{pmatrix}2 \\ 2 \\ 2 \\ 2\end{pmatrix} \\
+\frac{\partial a^1}{\partial z^1} = \operatorname{diag}(I_{z^1 > 0}) \implies \frac{\partial \mathcal L}{\partial z^1} = \frac{\partial a^1}{\partial z^1} \cdot \frac{\partial \mathcal L}{\partial a^1} = \begin{pmatrix} 2 \\ 2 \\ 0 \\ 0 \end{pmatrix} \\
+\frac{\partial z^1}{\partial W^1} = x \implies \frac{\partial \mathcal L}{\partial W^1} = x \cdot \left( \frac{\partial \mathcal L}{\partial z^1} \right)^T = \begin{pmatrix} 6 & 6 & 0 & 0 \\ 28 & 28 & 0 & 0 \end{pmatrix} \\
+\frac{\partial z^1}{\partial w^1_0} = 1 \implies \frac{\partial \mathcal L}{\partial w^1_0} = \frac{\partial \mathcal L}{\partial z^1} \cdot \frac{\partial z^1}{\partial w^1_0} = \begin{pmatrix} 2 \\ 2 \\ 0 \\ 0 \end{pmatrix}   
+\end{gather}
+
+再根据学习率 $\eta = 0.1$ 更新参数：
+
+\begin{gather}
+W^1 \gets W^1 - \eta \frac{\partial \mathcal L}{\partial W^1} = \begin{pmatrix} 1 & 0 & -1 & 0 \\ 0 & 1 & 0 & -1\end{pmatrix} - 0.1 \begin{pmatrix} 6 & 6 & 0 & 0 \\ 28 & 28 & 0 & 0 \end{pmatrix} = \begin{pmatrix} 0.4 & -0.6 & -0.1 & 0 \\ -2.8 & -1.8 & 0 & -0.1 \end{pmatrix} \\
+w^1_0 \gets w^1_0 - \eta \frac{\partial \mathcal L}{\partial w^1_0} = \begin{pmatrix} -1 \\ -1 \\ -1 \\ -1 \end{pmatrix} - 0.1 \begin{pmatrix} 2 \\ 2 \\ 0 \\ 0 \end{pmatrix} = \begin{pmatrix} -1.2 \\ -1.2 \\ -1 \\ -1 \end{pmatrix} \\
+W^2 \gets W^2 - \eta \frac{\partial \mathcal L}{\partial W^2} = \begin{pmatrix} 1 & -1 \\ 1 & -1 \\ 1 & -1 \\ 1 & -1 \end{pmatrix} - 0.1 \begin{pmatrix} 2 & -2 \\ 13 & -13 \\ 0 & 0 \\ 0 & 0 \end{pmatrix} = \begin{pmatrix} 0.8 & -0.8 \\ -0.3 & 0.3 \\ 1 & -1 \\ 1 & -1 \end{pmatrix} \\
+w^2_0 \gets w^2_0 - \eta \frac{\partial \mathcal L}{\partial w^2_0} = \begin{pmatrix}0 \\ 2 \end{pmatrix} - 0.1 \begin{pmatrix} 1 \\ -1 \end{pmatrix} = \begin{pmatrix} -0.1 \\ 2.1 \end{pmatrix}
+\end{gather}
 \end{document}
