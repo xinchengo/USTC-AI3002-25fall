@@ -11,7 +11,7 @@ def data_preprocess(example: np.ndarray) -> np.ndarray:
     img_np = np.array(example["image"], dtype=np.uint8)
 
     # TODO: 1. 将图像扩展维度 (28,28) -> (1,28,28)
-    img_np_with_channel = np.expand_dims(img_np_with_channel, axis=0)
+    img_np_with_channel = np.expand_dims(img_np, axis=0)
     
     # TODO: 2. 将图像展平为一维数组 (28,28) -> (784,)
     img_np_flat = img_np.flatten()
@@ -165,9 +165,30 @@ class GMM:
         K = self.n_components
         N = X.shape[0]
         log_prob = np.empty((N, K), dtype=X.dtype)
-        
 
-        raise NotImplementedError("完成 GMM._estep 方法")
+        D = X.shape[1]
+
+        # 计算正态分布中的 Mahalanobis 距离项
+        diff = X[:, np.newaxis, :] - self.means_[np.newaxis, :, :]  # (N, K, D)
+        cov_reg = self.covariances_ + self.reg_covar * np.eye(D)[np.newaxis, :, :]  # (K, D, D)
+        inv_cov = np.linalg.inv(cov_reg)  # (K, D, D)
+        maha = np.einsum('nkd,kde,nke->nk', diff, inv_cov, diff)  # (N, K)
+
+        log_prob = (np.log(self.weights_)[np.newaxis, :] 
+                    - 0.5 * np.log(np.linalg.det(cov_reg))[np.newaxis, :]
+                    - 0.5 * D * np.log(2 * np.pi)
+                    - 0.5 * maha)
+
+        # 归一化
+        resp = np.exp(log_prob)
+        resp_sum = resp.sum(axis=1, keepdims=True)
+        resp /= resp_sum
+
+        # 计算下界
+        log_resp_sum = np.log(resp_sum).flatten()
+        lower_bound = np.sum(log_resp_sum)
+
+        # raise NotImplementedError("完成 GMM._estep 方法")
         return resp, lower_bound
 
     def _mstep(self, X: np.ndarray, resp: np.ndarray) -> None:
@@ -185,7 +206,12 @@ class GMM:
         3. self.covariances_: 每个高斯分布的协方差矩阵
         """
 
-        raise NotImplementedError("完成 GMM._mstep 方法")
+        self.weights_ = np.mean(resp, axis=0)
+        self.means_ = (resp.T @ X) / resp.sum(axis=0)[:, np.newaxis]
+        X_centered = X[:, np.newaxis, :] - self.means_[np.newaxis, :, :]
+        self.covariances_ = np.einsum('nk,nkd,nke->kde', resp, X_centered, X_centered) / resp.sum(axis=0)[:, np.newaxis, np.newaxis]
+
+        # raise NotImplementedError("完成 GMM._mstep 方法")
 
     def fit(self, X: np.ndarray) -> "GMM":
         rng = self._rng()

@@ -215,3 +215,5 @@ latex/
 .build/
 saves/
 .vscode/
+/LABs/LAB2/code/data/
+/LABs/LAB2/code/results/
