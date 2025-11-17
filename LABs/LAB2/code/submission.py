@@ -207,7 +207,7 @@ class GMM:
         """
 
         self.weights_ = np.mean(resp, axis=0)
-        self.means_ = (resp.T @ X) / resp.sum(axis=0)[:, np.newaxis]
+        self.means_ = (resp.T @ X) / resp.sum(axis=0)[:, np.newaxis] # (K, D)
         X_centered = X[:, np.newaxis, :] - self.means_[np.newaxis, :, :]
         self.covariances_ = np.einsum('nk,nkd,nke->kde', resp, X_centered, X_centered) / resp.sum(axis=0)[:, np.newaxis, np.newaxis]
 

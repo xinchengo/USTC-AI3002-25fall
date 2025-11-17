@@ -1,0 +1,346 @@
+\documentclass{ctexart}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{siunitx}
+\usepackage{amsthm}
+\usepackage{booktabs}
+\usepackage{mathtools}
+\usepackage{hyperref}
+\usepackage{geometry}
+\geometry{a4paper, left=1in, right=1in, top=1in, bottom=1in}
+
+\allowdisplaybreaks
+
+\title{《人工智能与机器学习基础》第二次作业}
+\author{PB24000150 李欣宸}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{第一题}
+
+\subsection{(a)}
+
+记我们的原始数据矩阵为 $X_{\textrm{raw}}$，我们有归一化公式：
+\begin{equation}
+    X = D^{-1} \widetilde{X}
+\end{equation}
+
+其中（$J_{mm} \in \mathbb{R}^{m \times m}$ 是全 1 矩阵）：
+\begin{equation}
+    \widetilde{X} = X_{\textrm{raw}} - \frac{1}{m} X_{\textrm{raw}} J_{mm}, \quad D = \mathrm{diag}\left( \sqrt{\frac{1}{m}( \widetilde{X} \odot \widetilde{X} ) \mathbf{1}_m} \right)
+\end{equation}
+
+在很多数据中，特征的绝对大小没有实际意义。“中心化”起到的作用就是消除不同特征的量纲和绝对大小的影响，使得 PCA 的结果更能反映实际。
+
+\subsection{(b)}
+
+首先我们知道 $x$ 在方向 $u$ 上的投影为 $(x^T u) u$，我们想在 $u^Tu=1$ 的条件下最小化投影点和原始点的均方误差，使用 Lagrange 乘子法：
+\begin{gather}
+\begin{aligned}
+    \mathcal{L}(u, \lambda) &= \sum_{i=1}^m \left\|x^{(i)} - (x^{(i)T} u) u\right\|^2 + \lambda (u^T u - 1) \\
+    &= \sum_{i=1}^m \left( x^{(i)T} x^{(i)} - 2 (x^{(i)T} u)^2 + (x^{(i)T} u)^2 (u^T u) \right) + \lambda (u^T u - 1) \\
+    &= \sum_{i=1}^m x^{(i)T} x^{(i)} - \sum_{i=1}^m (x^{(i)T} u)^2 + \lambda (u^T u - 1)
+\end{aligned} \\
+\frac{\partial \mathcal{L}}{\partial u} = -2 \sum_{i=1}^m (x^{(i)T} u) x^{(i)} + 2 \lambda u = -2 X^T X u + 2 m \lambda u = 0 \\
+\implies \quad \boxed{\frac{1}{m} X^T X u = \lambda u} \label{eq:eigen}
+\end{gather}
+
+把这一结果带回到 $\mathcal{L}$ 中：
+\begin{gather}
+    \eqref{eq:eigen} \implies u^T X^T X u = m \lambda u^T u = m \lambda \\
+    \implies \mathcal{L}(u, \lambda) = \sum_{i=1}^m x^{(i)T} x^{(i)} - m \lambda + \lambda (u^T u - 1) = \sum_{i=1}^m x^{(i)T} x^{(i)} - m \lambda \label{eq:lagrange}
+\end{gather}
+
+
+由于 $X$ 是经过归一化的数据，所以 $S = \frac{1}{m} X^T X$ 就是数据的协方差矩阵；因此可能的 $\lambda$ 和 $u$ 就是协方差矩阵的特征值和特征向量。为了最小化 \eqref{eq:lagrange}，我们需要选用最大的特征值对应的特征向量作为 $u$——即，最小化均方误差的单位长度向量 $u$ 是对应于数据的第一个主成分。
+
+\section{第二题第一部分}
+
+\subsection{(a)}
+
+\begin{table}[htbp]
+    \centering
+    \caption{第一个 $k$-means 算法的迭代过程}
+    \label{k-means-1}
+    \begin{tabular}{ccccc}
+        \toprule
+        迭代次数 & 簇 1 中的下标 & 簇 2 中的下标 & 新的簇 1 中心 & 新的簇 2 中心 \\
+        \midrule
+        1 & $\{1, 2, 3, 4\}$ & $\{5, 6, 7, 8\}$ & $(1.5, 1.5)$ & $(10.5, 10.5)$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+算法在第一次迭代后收敛，最终的类中心为 $(1.5, 1.5)$ 和 $(10.5, 10.5)$。
+\subsection{(b)}
+
+\begin{table}[htbp]
+    \centering
+    \caption{第二个 $k$-means 算法的迭代过程}
+    \label{k-means-2}
+    \begin{tabular}{ccccc}
+        \toprule
+        迭代次数 & 簇 1 中的下标 & 簇 2 中的下标 & 新的簇 1 中心 & 新的簇 2 中心 \\
+        \midrule
+        1 & $\{1, 2, 3\}$ & $\{4, 5, 6, 7, 8\}$ & $\left(\frac{4}{3}, \frac{4}{3}\right)$ & $(8.8, 8.8)$ \\
+        2 & $\{1, 2, 3, 4\}$ & $\{5, 6, 7, 8\}$ & $(1.5, 1.5)$ & $(10.5, 10.5)$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+算法在第二次迭代后收敛\footnote{这题的运算中会遇到数据点离两个簇中心的距离相等的情况，可能导致簇的划分不唯一；在这里统一认为数据点会被划分到编号较小的簇中}，最终的类中心为 $(1.5, 1.5)$ 和 $(10.5, 10.5)$。
+
+\subsection{(c)}
+
+解决初始中心选择问题的方法有但不限于这些：
+
+\begin{enumerate}
+    \item 多次运行 $k$-means 算法，选择样本到簇中心距离平方和最小的一次结果作为最终结果；
+    \item 使用 $k$-means++ 算法选择初始中心，增加初始中心之间的散布程度，减少陷入局部最优的可能性；
+    \item 对数据进行预处理，去除明显的异常值；
+    \item 使用层次聚类（hierarchical clustering）算法，逐步增加簇的数量，用上一步算法的结果加以扰动作为下一步的初始中心。
+\end{enumerate}
+
+\subsection{(d)}
+
+每个点被选中的概率与其与 $c_1$ 的距离平方成正比，结果如表 \ref{k-means-pp}：
+
+\begin{table}[htbp]
+    \centering
+    \caption{$k$-means++算法中每个点被选中为第二个类中心的概率}
+    \label{k-means-pp}
+    \begin{tabular}{ccccccccc}
+        点 & (1,1) & (1,2) & (2,1) & (2,2) & (10, 10) & (10, 11) & (11, 10) & (11, 11) \\
+        \midrule
+        距离平方 & 0 & 1 & 1 & 2 & 162 & 181 & 181 & 200 \\
+        概率（\%） & \num{0} & \num{0.14} & \num{0.14} & \num{0.27} & \num{22.25} & \num{24.86} & \num{24.86} & \num{27.47} \\
+        概率（分数） & $\tfrac{0}{1}$ & $\tfrac{1}{728}$ & $\tfrac{1}{728}$ & $\tfrac{1}{364}$ & $\tfrac{81}{364}$ & $\tfrac{181}{728}$ & $\tfrac{181}{728}$ & $\tfrac{25}{91}$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+\subsection{(e)}
+
+每个点被选中的概率与其与 $c_1$、$c_2$ 距离平方的最小值成正比，结果如表 \ref{k-means-pp-2}：
+
+\begin{table}[htbp]
+    \centering
+    \caption{$k$-means++算法中每个点被选中为第三个类中心的概率}
+    \label{k-means-pp-2}
+    \begin{tabular}{ccccccccc}
+        点 & (1,1) & (1,2) & (2,1) & (2,2) & (10, 10) & (10, 11) & (11, 10) & (11, 11) \\
+        \midrule
+        距离平方最小值 & 0 & 1 & 1 & 2 & 0 & 1 & 1 & 2 \\
+        概率（\%） & \num{0} & \num{12.5} & \num{12.5} & \num{25} & \num{0} & \num{12.5} & \num{12.5} & \num{25} \\
+        概率（分数） & $\tfrac{0}{1}$ & $\tfrac{1}{8}$ & $\tfrac{1}{8}$ & $\tfrac{1}{4}$ & $\tfrac{0}{1}$ & $\tfrac{1}{8}$ & $\tfrac{1}{8}$ & $\tfrac{1}{4}$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\section{第二题第二部分}
+\subsection{(a)}
+
+虽然对于核 $k$-均值聚类我们往往无法显式计算 $\mu_i$，但是我们仍然有特征空间中簇中心的求解公式：
+\begin{equation}
+    \mu_{i} = \frac{1}{|C_i|}\sum_{x\in C_i} \phi(x)
+\end{equation}
+
+\subsection{(b)}
+
+\begin{gather}
+\left\| \phi(x) - \mu_i \right\|^2 = K(x, x) - \frac{2}{|C_i|}\sum_{y\in C_i}K(x, y) + \frac{1}{|C_i|^2}\sum_{y\in C_i}\sum_{z\in C_i} K(y, z) \\
+\begin{aligned}
+    \implies \quad c &= \arg \min_{i}  \left\| \phi(x) - \mu_i \right\|^2 \\
+    &= \arg \min_{i} \left[ \frac{1}{|C_i|^2}\sum_{y\in C_i}\sum_{z\in C_i} K(y, z) - \frac{2}{|C_i|}\sum_{y\in C_i}K(x, y)\right]
+\end{aligned}
+\end{gather}
+
+这个算法中没有出现任何单独的 $\phi(x)$ 和 $\mu_i$ 项，只需要预先计算所有点对之间的核函数。
+
+\section{第三题}
+\subsection{(a)}
+
+隐 Markov 模型中的 EM 算法称为 Baum-Welch 算法，下面给出 Baum-Welch 算法的简单推导过程，先定义一些符号：
+\begin{itemize}
+    \item $X = (x_1, x_2, \ldots, x_T)$ 观察序列；
+    \item $Z = (z_1, z_2, \ldots, z_T)$ 对应的隐状态序列；
+    \item $\Phi=\{\phi_j\}_{j=1}^K$ 为发射参数，其中 $\phi_j$ 对 $p(x_t|z_t-j,\phi_j)$ 参数化； 
+    \item $A = \{a_{ij}\}_{i,j=1}^K$ 为转移概率；
+    \item $\pi = \{\pi_i\}_{i=1}^K$ 为初始状态分布。
+\end{itemize}
+
+由一般 EM 算法中 Q 函数的定义：
+\begin{equation}
+    Q(\theta|\theta^{(n)}) = \mathbb{E}_{Z|X,\theta^{(n)}} [\log P(X, Z|\theta)] \label{q-func}
+\end{equation}
+
+由 Markov 性质，后验分布下的对数似然可以写成：
+\begin{gather}
+    \log P(X, Z|\theta) = \log \pi_{z_1} + \sum_{t=1}^{T-1} \log A_{z_t, z_{t+1}} + \sum_{t=1}^{T} \log p(x_t|z_t, \phi_{z_t}) \\
+    \begin{aligned}
+    \implies Q(\theta|\theta^{(n)}) &= \sum_{z_1} P(z_1|X,\theta^{(n)}) \log \pi_{z_1} + \sum_{t=1}^{T-1} \sum_{i=1}^{K} \sum_{j=1}^{K} P(z_t=i, z_{t+1}=j|X,\theta^{(n)}) \log a_{ij} \\ 
+    &\quad + \sum_{t=1}^{T} \sum_{i=1}^{K} P(z_t=i|X,\theta^{(n)}) \log p(x_t|z_t=i, \phi_i) \\
+    &\triangleq Q_{\pi} + Q_{A} + Q_{\Phi}
+    \end{aligned}\\
+    \gamma_t(i) \triangleq P(z_t=i|X,\theta^{(n)}), \quad \xi_t(i,j) \triangleq P(z_t=i, z_{t+1}=j|X,\theta^{(n)}) \label{gamma-xi}\\
+    \begin{aligned}
+    \implies Q(\theta|\theta^{(n)}) &= \sum_{i=1}^{K} \gamma_1(i) \log \pi_i + \sum_{t=1}^{T-1} \sum_{i=1}^{K} \sum_{j=1}^{K} \xi_t(i,j) \log a_{ij} + \sum_{t=1}^{T} \sum_{i=1}^{K} \gamma_t(i) \log p(x_t|z_t=i, \phi_i)
+    \end{aligned} \label{q-decomposed}
+\end{gather}
+
+由 \eqref{q-decomposed} 可以看出，\eqref{gamma-xi} 中的 $\gamma_t(i)$ 和 $\xi_t(i,j)$ 可以确定 Q 函数。
+
+由一般的 EM 算法定义，E 步中我们要根据当前参数计算 $\gamma_t(i)$ 和 $\xi_t(i,j)$，从而计算 Q 函数；M 步中我们要最大化 Q 函数以更新参数估计 $\theta^{(n+1)}$。
+
+\subsubsection{Baum-Welch 算法的 E 步}
+我们考虑如何计算 $\gamma_t(i)$ 和 $\xi_t(i,j)$。由于 X 是序列信息，我们考虑是否可以用递推的方法计算某种前缀和后缀信息，并把两种信息进行合并；这就是前向-后向算法的基本思想，定义：
+\begin{align}
+    \alpha_t(i) &\triangleq p(X[1:t], z_t=i|\theta^{(n)}) \\
+    \beta_t(i) &\triangleq p(X[t+1:T]|z_t=i,\theta^{(n)})
+\end{align}
+
+则边缘化后验可以写成：
+\begin{gather}
+    \gamma_t(i) = \frac{p(X,z_t=i|\theta^{(n)})}{p(X|\theta^{(n)})} = \frac{\alpha_t(i) \beta_t(i)}{p(X|\theta^{(n)})} \label{gamma}\\
+    \xi_t(i,j) = \frac{p(X,z_t=i,z_{t+1}=j|\theta^{(n)})}{p(X|\theta^{(n)})} = \frac{\alpha_t(i) a_{ij} p(x_{t+1}|z_{t+1}=j, \phi_j) \beta_{t+1}(j)}{p(X|\theta^{(n)})} \label{xi}
+\end{gather}
+
+而其中的 $\alpha_t(i)$ 和 $\beta_t(i)$ 可以按照以下递推式计算得到：
+\begin{align}
+    \alpha_1(i) &= \pi_i p(x_1|z_1=i, \phi_i) \notag \\
+    \alpha_{t+1}(j) &= \left[ \sum_{i=1}^{K} \alpha_t(i) a_{ij} \right] p(x_{t+1}|z_{t+1}=j, \phi_j) \label{alpha-recursion}\\
+    \beta_T(i) &= 1 \notag \\
+    \beta_t(i) &= \sum_{j=1}^{K} a_{ij} p(x_{t+1}|z_{t+1}=j, \phi_j) \beta_{t+1}(j) \label{beta-recursion}
+\end{align}
+
+\subsubsection{Baum-Welch 算法的 M 步}
+
+\begin{itemize}
+    \item 对于 $\pi$，我们要最大化 $Q_{\pi} = \sum_{i=1}^{K} \gamma_1(i) \log \pi_i$，加上约束条件 $\sum_{i=1}^{K} \pi_i = 1,~\pi_i \ge 0$，使用 Lagrange 乘子法：
+    \begin{gather}
+        \mathcal{L}(\pi, \lambda) = \sum_{i=1}^{K} \gamma_1(i) \log \pi_i + \lambda \left( \sum_{i=1}^{K} \pi_i - 1 \right) \\
+        \frac{\partial \mathcal{L}}{\partial \pi_i} = \frac{\gamma_1(i)}{\pi_i} + \lambda = 0 \implies \pi_i = -\frac{\gamma_1(i)}{\lambda} \\
+        \implies \sum_{i=1}^{K} \pi_i = -\frac{1}{\lambda} \sum_{i=1}^{K} \gamma_1(i) = 1 \implies \lambda = -\sum_{i=1}^{K} \gamma_1(i) = -1 \\
+        \implies \boxed{\pi_i^{(n+1)} = \gamma_1(i)} \label{pi-update}
+    \end{gather}
+    \item 对于 $A$，我们要最大化 $Q_{A} = \sum_{t=1}^{T-1} \sum_{i,j} \xi_t(i,j) \log a_{ij}$，加上约束条件 $\sum_{j=1}^{K} a_{ij} = 1,~a_{ij} \ge 0$，使用 Lagrange 乘子法：
+    \begin{gather}
+        \mathcal{L}(A, \{\lambda_i\}) = \sum_{t=1}^{T-1} \sum_{i=1}^{K} \sum_{j=1}^{K} \xi_t(i,j) \log a_{ij} + \sum_{i=1}^{K} \lambda_i \left( \sum_{j=1}^{K} a_{ij} - 1 \right) \\
+        \frac{\partial \mathcal{L}}{\partial a_{ij}} = \sum_{t=1}^{T-1} \frac{\xi_t(i,j)}{a_{ij}} + \lambda_i = 0 \implies a_{ij} = -\frac{\sum_{t=1}^{T-1} \xi_t(i,j)}{\lambda_i} \\
+        \implies \sum_{j=1}^{K} a_{ij} = -\frac{1}{\lambda_i} \sum_{j=1}^{K} \sum_{t=1}^{T-1} \xi_t(i,j) = 1 \implies \lambda_i = -\sum_{j=1}^{K} \sum_{t=1}^{T-1} \xi_t(i,j) = -\sum_{t=1}^{T-1} \gamma_t(i) \\
+        \implies \boxed{a_{ij}^{(n+1)} = \frac{\sum_{t=1}^{T-1} \xi_t(i,j)}{\sum_{t=1}^{T-1} \gamma_t(i)}} \label{a-update}
+    \end{gather}
+    \item 对于 $\Phi$，我们要最大化 $Q_{\Phi} = \sum_{t=1}^{T} \sum_{i=1}^{K} \gamma_t(i) \log p(x_t|z_t=i, \phi_i)$
+    
+    该题中的发射形式为离散发射，观察值可能的取值为字母表 $\mathcal{V} = \{v_1, v_2, \ldots, v_M\}$，观察分布 $B_j(x) = p(x|z_t=j, \phi_j)=b_j(x)$ 满足 $\sum_{k=1}^{M} b_j(v_k) = 1,~b_j(v_k) \ge 0$。使用 Lagrange 乘子法：
+    \begin{gather}
+        \mathcal{L}(\Phi, \{\lambda_j\}) = \sum_{t=1}^{T} \sum_{i=1}^{K} \gamma_t(i) \log b_i(x_t) + \sum_{j=1}^{K} \lambda_j \left( \sum_{k=1}^{M} b_j(v_k) - 1 \right) \\
+        \frac{\partial \mathcal{L}}{\partial b_j(v_k)} = \sum_{t:x_t=v_k} \frac{\gamma_t(j)}{b_j(v_k)} + \lambda_j = 0 \implies b_j(v_k) = -\frac{\sum_{t:x_t=v_k} \gamma_t(j)}{\lambda_j} \\
+        \implies \sum_{k=1}^{M} b_j(v_k) = -\frac{1}{\lambda_j} \sum_{k=1}^{M} \sum_{t:x_t=v_k} \gamma_t(j) = -\frac{1}{\lambda_j} \sum_{t=1}^{T} \gamma_t(j) = 1 \implies \lambda_j = -\sum_{t=1}^{T} \gamma_t(j) \\
+        \implies \boxed{b_j^{(n+1)}(v_k) = \frac{\sum_{t:x_t=v_k} \gamma_t(j)}{\sum_{t=1}^{T} \gamma_t(j)}} \label{b-update}
+    \end{gather}
+\end{itemize}
+
+\subsubsection{本题的计算}
+
+将 Sunny, Rainy 分别编号为 0，1；高温、低温分别编号为 0，1。观察序列 $X = (0, 1, 0, 1)$。则按照递推公式 \eqref{alpha-recursion} 和 \eqref{beta-recursion} 可以得到：
+\begin{gather}
+    (\alpha_t(i))_{i,t} = \begin{pmatrix}
+    0.32  & 0.0492 & 0.066288 & 0.01054908 \\
+    0.18 & 0.1778 & 0.043242  & 0.03974922
+    \end{pmatrix} \\
+    (\beta_t(i))_{i,t} = \begin{pmatrix}
+        0.09018 & 0.258 & 0.4 & 1 \\
+        0.119115 & 0.2115 & 0.55 & 1
+    \end{pmatrix}
+\end{gather}
+
+根据 \eqref{gamma} 和 \eqref{xi}，可以得到：
+\begin{gather}
+    (\gamma_t(i))_{i,t} = \begin{pmatrix}
+    0.57372913 & 0.25236638 & 0.52715897 & 0.20973035 \\
+    0.42627087 & 0.74763362 & 0.47284103 & 0.79026965
+    \end{pmatrix}
+\\
+    (\xi_t(i, j)) = \left\{ \begin{pmatrix}
+    0.19696888 & 0.37676025 \\
+    0.0553975 & 0.37087337
+    \end{pmatrix},
+    \begin{pmatrix}
+       0.18780754 & 0.06455884 \\
+        0.33935143 & 0.40828219
+    \end{pmatrix},
+    \begin{pmatrix}
+       0.15814769 & 0.36901128 \\
+        0.05158266 & 0.42125837
+    \end{pmatrix}
+        \right\}
+\end{gather}
+
+根据 \eqref{pi-update}，\eqref{a-update}，\eqref{b-update}，可以得到更新后的参数：
+\begin{gather}
+    \pi^{(1)} = \begin{pmatrix}
+        0.57372913 & 0.42627087
+    \end{pmatrix} \\
+    A^{(1)} = \begin{pmatrix}
+        0.40119883 & 0.59880117 \\
+        0.27103859 & 0.72896141
+    \end{pmatrix}
+\\
+    B^{(1)} = \begin{pmatrix}
+        0.70434983 & 0.29565017 \\
+        0.3689398 & 0.6310602
+    \end{pmatrix}
+\end{gather}
+
+\subsection{(b)}
+
+我们的目标是证明对数似然函数 $l(\theta) = \log p(O|\theta)$ 单调递增且有上界，从而证明 EM 算法的收敛性。
+
+在 EM 算法中，对数似然，证据下界，Q 函数之间满足以下的关系：
+\begin{gather}
+    \log p(O|\theta) = \mathcal{L}(q, \theta) + \mathrm{KL}(q(Q) || p(Q|O,\theta)) \label{eq:elbo-decomp}\\
+    \mathcal{L}(q, \theta) = Q(q, \theta) + H(q)
+\end{gather}
+
+其中 $\mathcal{L}(q, \theta)$ 为证据下界（ELBO），$Q(q, \theta) = \mathbb{E}_{Q \sim q}[\log p(O, Q|\theta)]$ 为 Q 函数，$H(q) = -\mathbb{E}_{Q \sim q}[\log q(Q)]$ 为熵。
+
+\textbf{E 步：}由于我们选择了 $q^{(n)}(Q) = p(Q|O,\theta^{(n)})$，所以有：
+\begin{gather}
+    \mathrm{KL}(q^{(n)}(Q) || p(Q|O,\theta^{(n)})) = 0 \\
+    \implies \quad \log p(O|\theta^{(n)}) = \mathcal{L}(q^{(n)}, \theta^{(n)})
+\end{gather}
+
+\textbf{M 步：}由于我们选择了 $\theta^{(n+1)} = \arg \max_{\theta} Q(\theta|\theta^{(n)}) = \arg \max_{\theta} Q(q^{(n)}, \theta)$（注意 $H(q^{(n)})$ 与 $\theta$ 无关），所以有：
+\begin{gather}
+    Q(q^{(n)}, \theta^{(n+1)}) \ge Q(q^{(n)}, \theta^{(n)}) \\
+    \begin{aligned}
+    \implies \mathcal{L}(q^{(n)}, \theta^{(n+1)}) &= Q(q^{(n)}, \theta^{(n+1)}) + H(q^{(n)}) \\
+    &\ge Q(q^{(n)}, \theta^{(n)}) + H(q^{(n)}) \\
+    &= \mathcal{L}(q^{(n)}, \theta^{(n)}) \\
+    &= \log p(O|\theta^{(n)})
+    \end{aligned}
+\end{gather}
+
+由 \eqref{eq:elbo-decomp} 和 KL 散度的非负性，我们有：
+\begin{gather}
+    \log p(O|\theta^{(n+1)}) = \mathcal{L}(q^{(n)}, \theta^{(n+1)}) + \mathrm{KL}(q^{(n)}(Q) || p(Q|O,\theta^{(n+1)})) \ge \mathcal{L}(q^{(n)}, \theta^{(n+1)}) \\
+    \implies \log p(O|\theta^{(n+1)}) \ge \mathcal{L}(q^{(n)}, \theta^{(n+1)}) \ge \log p(O|\theta^{(n)})
+\end{gather}
+
+这表明对数似然函数 $l(\theta) = \log p(O|\theta)$ 在每次迭代后单调不减。又因为 $\log p(O|\theta) \le 0$（概率不超过 1），对数似然函数有上界。由于单调有界的数列必有极限，EM 算法必然收敛。
+
+\subsection{(c)}
+
+因为对数似然函数 $l(\theta) = \log p(O|\theta)$ 通常是一个复杂的非凸函数，EM 算法等价于证据下界的坐标下降法，所以不能保证收敛到全局最优解，只能保证收敛到某个局部最优解或鞍点。
+
+解决方法有但不限于：
+\begin{itemize}
+    \item 多次运行 EM 算法，选择对数似然值最高的一次结果作为最终结果；
+    \item 使用随机 EM 算法，在 E 步中使用采样的方法近似计算后验分布，从而增加算法的随机性，减少陷入局部最优的可能性。
+\end{itemize}
+
+\end{document}
