@@ -164,28 +164,32 @@ class GMM:
         # responsibilities
         K = self.n_components
         N = X.shape[0]
-        log_prob = np.empty((N, K), dtype=X.dtype)
-
         D = X.shape[1]
 
-        # 计算正态分布中的 Mahalanobis 距离项
-        diff = X[:, np.newaxis, :] - self.means_[np.newaxis, :, :]  # (N, K, D)
-        cov_reg = self.covariances_ + self.reg_covar * np.eye(D)[np.newaxis, :, :]  # (K, D, D)
-        inv_cov = np.linalg.inv(cov_reg)  # (K, D, D)
-        maha = np.einsum('nkd,kde,nke->nk', diff, inv_cov, diff)  # (N, K)
+        log_prob = np.empty((N, K), dtype=X.dtype)
+        
+        for k in range(K):
+            # 计算正态分布中的 Mahalanobis 距离项
+            diff = X - self.means_[k] # (N, D)
+            cov_k = self.covariances_[k] + self.reg_covar * np.eye(D) # (D, D)
+            
+            # 使用 slogdet 计算对数行列式，避免溢出
+            sign, logdet = np.linalg.slogdet(cov_k)
+            
+            inv_cov_k = np.linalg.inv(cov_k)
+            maha_k = np.sum((diff @ inv_cov_k) * diff, axis=1) # (N,)
+            
+            log_prob[:, k] = (np.log(self.weights_[k])
+                              - 0.5 * logdet
+                              - 0.5 * D * np.log(2 * np.pi)
+                              - 0.5 * maha_k)
 
-        log_prob = (np.log(self.weights_)[np.newaxis, :] 
-                    - 0.5 * np.log(np.linalg.det(cov_reg))[np.newaxis, :]
-                    - 0.5 * D * np.log(2 * np.pi)
-                    - 0.5 * maha)
-
-        # 归一化
-        resp = np.exp(log_prob)
-        resp_sum = resp.sum(axis=1, keepdims=True)
-        resp /= resp_sum
+        # 使用 logsumexp 计算归一化因子
+        log_resp_sum = np.logaddexp.reduce(log_prob, axis=1) # (N,)
+        log_resp = log_prob - log_resp_sum[:, np.newaxis] # (N, K)
+        resp = np.exp(log_resp)
 
         # 计算下界
-        log_resp_sum = np.log(resp_sum).flatten()
         lower_bound = np.sum(log_resp_sum)
 
         # raise NotImplementedError("完成 GMM._estep 方法")
@@ -205,11 +209,18 @@ class GMM:
         2. self.means_: 每个高斯分布的均值向量
         3. self.covariances_: 每个高斯分布的协方差矩阵
         """
-
-        self.weights_ = np.mean(resp, axis=0)
-        self.means_ = (resp.T @ X) / resp.sum(axis=0)[:, np.newaxis] # (K, D)
-        X_centered = X[:, np.newaxis, :] - self.means_[np.newaxis, :, :]
-        self.covariances_ = np.einsum('nk,nkd,nke->kde', resp, X_centered, X_centered) / resp.sum(axis=0)[:, np.newaxis, np.newaxis]
+        N = X.shape[0]
+        D = X.shape[1]
+        K = self.n_components
+        
+        Nk = resp.sum(axis=0) # (K,)
+        
+        self.weights_ = Nk / N
+        self.means_ = (resp.T @ X) / Nk[:, np.newaxis] # (K, D)
+        self.covariances_ = np.zeros((K, D, D))
+        for k in range(K):
+            diff = X - self.means_[k] # (N, D)
+            self.covariances_[k] = (diff.T @ (diff * resp[:, k][:, np.newaxis])) / Nk[k]
 
         # raise NotImplementedError("完成 GMM._mstep 方法")
 
@@ -240,6 +251,7 @@ class GMM:
             self._mstep(X, resp)
             self.n_iter_ = it
             improvement = (lower - prev_lower) / (abs(prev_lower) + 1e-12)
+            print(f"Iteration {it}, lower bound: {lower:.6f}, improvement: {improvement:.6f}")
             if improvement < self.tol:
                 self.converged_ = True
                 break
