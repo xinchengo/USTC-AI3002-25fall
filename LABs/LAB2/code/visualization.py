@@ -86,7 +86,7 @@ def plot_comparison_result(data_2d: np.ndarray,
     
     # 左图：使用true_label作为颜色
     ax_left = axes[0]
-    scatter1 = ax_left.scatter(data_2d[:, 0], data_2d[:, 1], c=true_labels, cmap="tab10", alpha=0.7)
+    scatter1 = ax_left.scatter(data_2d[:, 0], data_2d[:, 1], c=true_labels, cmap="tab10", alpha=0.7, marker='.')
     ax_left.set_xlabel("Component 1", fontsize=12)
     ax_left.set_ylabel("Component 2", fontsize=12)
     ax_left.set_title('True Label', fontsize=14, fontweight='bold')
@@ -94,7 +94,7 @@ def plot_comparison_result(data_2d: np.ndarray,
     
     # 右图：使用cluster_label作为颜色
     ax_right = axes[1]
-    scatter2 = ax_right.scatter(data_2d[:, 0], data_2d[:, 1], c=cluster_labels, cmap="tab10", alpha=0.7)
+    scatter2 = ax_right.scatter(data_2d[:, 0], data_2d[:, 1], c=cluster_labels, cmap="tab10", alpha=0.7, marker='.')
     ax_right.set_xlabel("Component 1", fontsize=12)
     ax_right.set_ylabel("Component 2", fontsize=12)
     ax_right.set_title('Cluster Label', fontsize=14, fontweight='bold')

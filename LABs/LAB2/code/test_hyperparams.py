@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-测试不同超参数组合对模型性能的影响
+Dedicated Hyperparameter Analysis: PCA Components & GMM Iterations/Tolerance
+Optimized with Multithreading/Multiprocessing
 """
 import os
-os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"  # 使用镜像站
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 import yaml
 import json
 import argparse
@@ -11,240 +12,303 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
-from sklearn.model_selection import ParameterGrid
 from sklearn.metrics import davies_bouldin_score
 from tqdm import tqdm
-import optuna
+from joblib import Parallel, delayed
 
 from util import set_seed, handle_results_path, ensure_dir
 from dataloader import MNISTLoader
 from submission import GMM, PCA
 
-def get_args():
-    parser = argparse.ArgumentParser(description="Hyperparameter Search for PCA + GMM")
-    parser.add_argument("--seed", type=int, default=42, help="Random seed")
-    parser.add_argument("--results_path", type=str, default="./results/hyperparams", help="Path to save results")
-    parser.add_argument("--gmm_components", type=int, default=10, help="Number of GMM components (clusters)")
-    parser.add_argument("--method", type=str, default="grid", choices=["grid", "bayes"], help="Search method: grid or bayes")
-    parser.add_argument("--n_trials", type=int, default=20, help="Number of trials for Bayesian optimization")
-    return parser.parse_args()
+def get_parser():
+    parser = argparse.ArgumentParser(description="Detailed Hyperparameter Analysis")
+    parser.add_argument("--seed", type=int, default=42, help="Base random seed")
+    parser.add_argument("--results_path", type=str, default="./results/hyperparams_detailed", help="Path to save results")
+    parser.add_argument("--gmm_components", type=int, default=10, help="Number of GMM components")
+    parser.add_argument("--gmm_max_iter", type=int, default=1000, help="Max iterations for GMM")
+    parser.add_argument("--n_trials", type=int, default=16, help="Number of trials per PCA setting")
+    parser.add_argument("--n_jobs", type=int, default=-1, help="Number of parallel jobs (-1 for all CPUs)")
+    parser.add_argument("--plot_only", action="store_true", help="Skip training and only generate plots from existing results")
+    parser.add_argument("--plot_dpi", type=int, default=300, help="DPI for saved plots")
+    parser.add_argument("--gmm_tolerance", type=float, default=1e-5, help="Convergence tolerance for GMM")
+    return parser
 
-def evaluate_model(params, traindata_raw, testdata_raw, args):
+def run_single_trial(n_components, trial_idx, seed, traindata_pca, testdata_pca, testdata_raw, gmm_args):
     """
-    Train PCA and GMM with given params and evaluate on test set.
-    Returns: dict with results
+    Worker function to run a single GMM trial.
     """
-    try:
-        # 1. PCA
-        pca = PCA(n_components=params['pca_components'])
-        pca.fit(traindata_raw)
-        traindata_pca = pca.transform(traindata_raw)
-        testdata_pca = pca.transform(testdata_raw)
-        
-        # 2. GMM
-        gmm = GMM(
-            n_components=args.gmm_components,
-            max_iter=params['gmm_max_iter'],
-            tol=params['gmm_tol'],
-            reg_covar=params['gmm_reg_covar'],
-            random_state=args.seed
-        )
-        gmm.fit(traindata_pca)
-        
-        # 3. Evaluate
-        labels = gmm.predict(testdata_pca)
-        score = davies_bouldin_score(testdata_raw, labels)
-        
-        result_entry = params.copy()
-        result_entry['db_score'] = score
-        result_entry['converged'] = gmm.converged_
-        result_entry['n_iter'] = gmm.n_iter_
-        return result_entry
-        
-    except Exception as e:
-        print(f"Error with params {params}: {e}")
-        result_entry = params.copy()
-        result_entry['db_score'] = float('inf')
-        result_entry['error'] = str(e)
-        return result_entry
-
-def plot_results(df, output_dir):
-    """
-    Generate visualizations for hyperparameter search results.
-    """
-    output_dir = Path(output_dir)
+    gmm = GMM(
+        n_components=gmm_args['n_components'],
+        max_iter=gmm_args['max_iter'],
+        tol=1e-5, # Strict tolerance to capture full history
+        reg_covar=1e-6,
+        random_state=seed
+    )
     
-    # 1. PCA Components vs DB Score
-    if 'pca_components' in df.columns:
-        plt.figure(figsize=(10, 6))
+    trial_history = []
+    
+    def step_callback(model, it, improvement):
+        # Predict on test set using current parameters
+        try:
+            labels = model.predict(testdata_pca)
+            score = davies_bouldin_score(testdata_raw, labels)
+        except Exception as e:
+            score = float('nan')
         
-        # Scatter plot of all trials
-        plt.scatter(df['pca_components'], df['db_score'], alpha=0.4, color='gray', label='Individual Trials')
-        
-        # Calculate stats
-        stats = df.groupby('pca_components')['db_score'].agg(['min', 'mean']).reset_index()
-        
-        # Plot Best (Min) score for each component count
-        plt.plot(stats['pca_components'], stats['min'], 'r-o', linewidth=2, label='Best Score per Component')
-        
-        # Plot Mean score
-        plt.plot(stats['pca_components'], stats['mean'], 'b--', label='Mean Score')
-        
-        # Highlight global best
-        best_idx = df['db_score'].idxmin()
-        plt.scatter(df.loc[best_idx, 'pca_components'], df.loc[best_idx, 'db_score'], 
-                    color='gold', marker='*', s=300, edgecolors='black', zorder=10, label='Global Best')
+        trial_history.append({
+            'pca_components': n_components,
+            'trial': trial_idx,
+            'seed': seed,
+            'iteration': it,
+            'improvement': improvement,
+            'db_score': score
+        })
 
-        plt.xlabel('PCA Components')
-        plt.ylabel('Davies-Bouldin Score (Lower is Better)')
-        plt.title('Impact of PCA Components on Clustering Performance')
-        plt.legend()
-        plt.grid(True, alpha=0.3)
-        plt.savefig(output_dir / "pca_vs_dbscore.png")
-        plt.close()
-
-    # 2. Reg Covar vs DB Score
-    if 'gmm_reg_covar' in df.columns:
-        plt.figure(figsize=(10, 6))
-        # Use scatter plot for continuous variables
-        plt.scatter(df['gmm_reg_covar'], df['db_score'], alpha=0.6, c='blue', label='Trial')
-        
-        # Highlight best point
-        best_idx = df['db_score'].idxmin()
-        plt.scatter(df.loc[best_idx, 'gmm_reg_covar'], df.loc[best_idx, 'db_score'], 
-                    color='red', marker='*', s=200, label='Best')
-        
-        plt.xscale('log')
-        plt.xlabel('GMM Regularization Covariance (log scale)')
-        plt.ylabel('Davies-Bouldin Score')
-        plt.title('Impact of Regularization on Clustering Performance')
-        plt.legend()
-        plt.grid(True)
-        plt.savefig(output_dir / "regcovar_vs_dbscore.png")
-        plt.close()
-
-    # 3. Max Iter vs DB Score
-    if 'gmm_max_iter' in df.columns:
-        plt.figure(figsize=(10, 6))
-        plt.scatter(df['gmm_max_iter'], df['db_score'], alpha=0.6, c='green', label='Trial')
-        
-        # Highlight best point
-        best_idx = df['db_score'].idxmin()
-        plt.scatter(df.loc[best_idx, 'gmm_max_iter'], df.loc[best_idx, 'db_score'], 
-                    color='red', marker='*', s=200, label='Best')
-
-        plt.xlabel('GMM Max Iterations')
-        plt.ylabel('Davies-Bouldin Score')
-        plt.title('Impact of Max Iterations on Clustering Performance')
-        plt.legend()
-        plt.grid(True)
-        plt.savefig(output_dir / "maxiter_vs_dbscore.png")
-        plt.close()
+    gmm.fit(traindata_pca, callback=step_callback)
+    return trial_history
 
 def main():
-    args = get_args()
+    parser = get_parser()
+    args = parser.parse_args()
     set_seed(args.seed)
     
-    # Handle results path
-    results_path = handle_results_path(args.results_path)
-    ensure_dir(results_path)
+    results_path = None
 
-    # Save args
-    with open(results_path / "config.yaml", "w") as f:
-        yaml.dump(vars(args), f)
+    if args.plot_only:
+        # If plot only mode is enabled, load existing results
+        if args.results_path is None:
+            print("Error: --results_path must be specified in plot only mode.")
+            return
+        results_path = Path(args.results_path)
 
-    # Load Data
-    print("Loading dataset...")
-    dataloader = MNISTLoader()
-    dataset = dataloader.load()
-    
-    trainset = dataset["train"].to_pandas()
-    traindata_raw = np.vstack(trainset["image1D"].to_numpy())
-    
-    testset = dataset["test"].to_pandas()
-    testdata_raw = np.vstack(testset["image1D"].to_numpy())
-
-    print(f"Training data shape: {traindata_raw.shape}")
-    print(f"Test data shape: {testdata_raw.shape}")
-
-    results = []
-
-    if args.method == "grid":
-        # Define Hyperparameter Grid
-        param_grid = {
-            'pca_components': [20, 40, 60, 80],
-            'gmm_max_iter': [50, 100],
-            'gmm_tol': [1e-3, 1e-4],
-            'gmm_reg_covar': [1e-6, 1e-4]
-        }
-        grid = ParameterGrid(param_grid)
-        print(f"Starting Grid Search with {len(grid)} combinations...")
+        # Load config from yaml file
+        config_path = results_path / "config.yaml"
+        if not config_path.exists():
+            print(f"Error: Config file not found at {config_path}")
+            return
         
-        for params in tqdm(grid):
-            res = evaluate_model(params, traindata_raw, testdata_raw, args)
-            results.append(res)
-
-    elif args.method == "bayes":
-        print(f"Starting Bayesian Optimization with {args.n_trials} trials...")
+        with open(config_path, "r") as f:
+            config = yaml.safe_load(f)
         
-        def objective(trial):
-            params = {
-                'pca_components': trial.suggest_int('pca_components', 2, 200, log=True),
-                'gmm_max_iter': trial.suggest_int('gmm_max_iter', 30, 150, step=10),
-                'gmm_tol': trial.suggest_float('gmm_tol', 1e-6, 1e-2, log=True),
-                'gmm_reg_covar': trial.suggest_float('gmm_reg_covar', 1e-12, 1e-2, log=True)
+        # Re-parse arguments with config as defaults
+        # This ensures: Config > Default, but CLI > Config
+        parser.set_defaults(**config)
+        args = parser.parse_args()
+        
+        print(f"Plot only mode: Loading results from: {results_path}")
+        csv_path = results_path / "detailed_results.csv"
+        if not csv_path.exists():
+            print(f"Error: Results file not found at {csv_path}")
+            return
+        df = pd.read_csv(csv_path)
+        
+        # Infer pca_components_list from the dataframe
+        if 'pca_components' in df.columns:
+            pca_components_list = sorted(df['pca_components'].unique().tolist())
+        else:
+            print("Error: 'pca_components' column not found in results.")
+            return
+            
+    else:
+        # Normal mode: Run experiments and save results
+        results_path = handle_results_path(args.results_path)
+        ensure_dir(results_path)
+        print(f"Results will be saved to: {results_path}")
+        # Save config
+        with open(results_path / "config.yaml", "w") as f:
+            yaml.dump(vars(args), f)
+
+        
+        # Load Data
+        print("Loading dataset...")
+        dataloader = MNISTLoader()
+        dataset = dataloader.load()
+        
+        trainset = dataset["train"].to_pandas()
+        traindata_raw = np.vstack(trainset["image1D"].to_numpy())
+        
+        testset = dataset["test"].to_pandas()
+        testdata_raw = np.vstack(testset["image1D"].to_numpy())
+
+        print(f"Training data shape: {traindata_raw.shape}")
+        print(f"Test data shape: {testdata_raw.shape}")
+
+        # Define PCA components range
+        pca_components_list = list(range(2, 24, 1)) + list(range(24, 50, 2)) + list(range(50, 101, 5))
+        
+        all_results = []
+
+        print(f"Starting Grid Search over PCA components: {pca_components_list}")
+        print(f"Using {args.n_jobs} parallel jobs for trials.")
+        
+        for n_components in tqdm(pca_components_list, desc="PCA Loop"):
+            # 1. Fit PCA once for this n_components
+            pca = PCA(n_components=n_components)
+            pca.fit(traindata_raw)
+            traindata_pca = pca.transform(traindata_raw)
+            testdata_pca = pca.transform(testdata_raw)
+            
+            # 2. Prepare args for parallel execution
+            seeds = [np.random.randint(0, 100000) for _ in range(args.n_trials)]
+            gmm_args = {
+                'n_components': args.gmm_components,
+                'max_iter': args.gmm_max_iter
             }
             
-            res = evaluate_model(params, traindata_raw, testdata_raw, args)
+            # 3. Run trials in parallel
+            # We use joblib to parallelize the trials
+            results = Parallel(n_jobs=args.n_jobs)(
+                delayed(run_single_trial)(
+                    n_components, 
+                    i, 
+                    seeds[i], 
+                    traindata_pca, 
+                    testdata_pca, 
+                    testdata_raw, 
+                    gmm_args
+                ) for i in range(args.n_trials)
+            )
             
-            # Store result in list for later analysis
-            results.append(res)
+            # 4. Collect results
+            for res in results:
+                all_results.extend(res)
+
+        # Convert to DataFrame
+        df = pd.DataFrame(all_results)
+        
+        # Save raw data
+        df.to_csv(results_path / "detailed_results.csv", index=False)
+        print(f"Saved raw results to {results_path / 'detailed_results.csv'}")
+
+    # ==========================================
+    # Plotting
+    # ==========================================
+    print("Generating plots...")
+    
+    from matplotlib.ticker import MaxNLocator
+
+    # 1. DBI vs PCA Components (at fixed tolerances)
+    # tolerances = [1e-2, 1e-3, ... , until args.gmm_tolerance]
+    tolerances = []
+    tol = 1e-2
+    while tol >= args.gmm_tolerance:
+        tolerances.append(tol)
+        tol /= 10
+    
+    plt.figure(figsize=(12, 8))
+    
+    for tol in tolerances:
+        summary_data = []
+        
+        # Use groupby to handle trials cleanly
+        # Group by PCA and Trial
+        grouped = df.groupby(['pca_components', 'trial'])
+        
+        for name, group in grouped:
+            pca_comp, trial = name
+            group = group.sort_values('iteration')
             
-            return res['db_score']
-
-        study = optuna.create_study(direction='minimize')
-        study.optimize(objective, n_trials=args.n_trials)
+            cutoff_row = group[group['improvement'] < tol]
+            if not cutoff_row.empty:
+                chosen_row = cutoff_row.iloc[0]
+            else:
+                chosen_row = group.iloc[-1]
+            
+            summary_data.append({
+                'pca_components': pca_comp,
+                'db_score': chosen_row['db_score']
+            })
+            
+        summary_df = pd.DataFrame(summary_data)
+        agg_df = summary_df.groupby('pca_components')['db_score'].agg(['mean', 'std']).reset_index()
         
-        print("Best trial:")
-        trial = study.best_trial
-        print(f"  Value: {trial.value}")
-        print("  Params: ")
-        for key, value in trial.params.items():
-            print(f"    {key}: {value}")
+        plt.errorbar(
+            agg_df['pca_components'], 
+            agg_df['mean'], 
+            yerr=agg_df['std'], 
+            label=f'tol={tol}',
+            capsize=3,
+            marker='x'
+        )
 
-    # Convert to DataFrame
-    df = pd.DataFrame(results)
-    
-    # Save results
-    csv_path = results_path / "hyperparameter_search_results.csv"
-    df.to_csv(csv_path, index=False)
-    print(f"Results saved to {csv_path}")
-    
-    json_path = results_path / "hyperparameter_search_results.json"
-    df.to_json(json_path, orient="records", indent=4)
-    print(f"Results saved to {json_path}")
+    plt.xlabel('PCA Components')
+    plt.ylabel('Davies-Bouldin Score')
+    plt.title('DBI vs PCA Components at Different Convergence Tolerances')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
+    plt.savefig(results_path / "dbi_vs_pca_by_tol.png", dpi=args.plot_dpi, bbox_inches='tight')
+    plt.close()
 
-    # Find best parameters
-    if not df.empty and 'db_score' in df.columns:
-        best_run = df.loc[df['db_score'].idxmin()]
-        print("\n" + "="*50)
-        print("Best Hyperparameters found:")
-        print(best_run)
-        print("="*50)
+    # 2. DBI vs Tolerance
+    plt.figure(figsize=(10, 6))
+    
+    selected_pcas = [10, 20, 40, 80]
+    selected_pcas = [p for p in selected_pcas if p in pca_components_list]
+    
+    for pca_comp in selected_pcas:
+        dbi_means = []
+        dbi_stds = []
+        pca_group = df[df['pca_components'] == pca_comp]
         
-        # Save best params separately
-        with open(results_path / "best_params.json", "w") as f:
-            best_dict = best_run.to_dict()
-            for k, v in best_dict.items():
-                if isinstance(v, (np.integer, np.floating)):
-                    best_dict[k] = float(v) if isinstance(v, np.floating) else int(v)
-            json.dump(best_dict, f, indent=4)
+        for tol in tolerances:
+            scores = []
+            
+            # Iterate over actual trials present in the data using groupby
+            # This avoids the IndexError and is cleaner
+            for trial_idx, trial_data in pca_group.groupby('trial'):
+                trial_data = trial_data.sort_values('iteration')
+                
+                cutoff = trial_data[trial_data['improvement'] < tol]
+                if not cutoff.empty:
+                    scores.append(cutoff.iloc[0]['db_score'])
+                else:
+                    scores.append(trial_data.iloc[-1]['db_score'])
+            
+            if scores:
+                dbi_means.append(np.mean(scores))
+                dbi_stds.append(np.std(scores))
+            else:
+                dbi_means.append(np.nan)
+                dbi_stds.append(np.nan)
+            
+        plt.errorbar(tolerances, dbi_means, yerr=dbi_stds, label=f'PCA={pca_comp}', marker='s', capsize=3)
 
-    # Visualization
-    print("Generating visualizations...")
-    plot_results(df, results_path)
-    print(f"Visualizations saved to {results_path}")
+    plt.xscale('log')
+    plt.gca().invert_xaxis()
+    plt.xlabel('Tolerance (log scale)')
+    plt.ylabel('Davies-Bouldin Score')
+    plt.title('DBI vs Convergence Tolerance')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.savefig(results_path / "dbi_vs_tol.png", dpi=args.plot_dpi, bbox_inches='tight')
+    plt.close()
+
+    # 3. DBI vs Iteration
+    plt.figure(figsize=(10, 6))
+    
+    for pca_comp in selected_pcas:
+        pca_data = df[df['pca_components'] == pca_comp]
+        iter_stats = pca_data.groupby('iteration')['db_score'].agg(['mean', 'std']).reset_index()
+        
+        plt.plot(iter_stats['iteration'], iter_stats['mean'], label=f'PCA={pca_comp}')
+        plt.fill_between(
+            iter_stats['iteration'], 
+            iter_stats['mean'] - iter_stats['std'], 
+            iter_stats['mean'] + iter_stats['std'], 
+            alpha=0.1
+        )
+
+    plt.xlabel('Iteration')
+    plt.ylabel('Davies-Bouldin Score')
+    plt.title('DBI vs Iteration (Training Progress)')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True)) # Ensure x-axis ticks are integers
+    plt.savefig(results_path / "dbi_vs_iter.png", dpi=args.plot_dpi, bbox_inches='tight')
+    plt.close()
+
+    print("Done!")
 
 if __name__ == "__main__":
     main()
-

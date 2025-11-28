@@ -22,6 +22,10 @@ def data_preprocess(example: np.ndarray) -> np.ndarray:
 
     # TODO: 4.（可选）进行相关数据预处理，例如：归一化、标准化等
 
+    # 不需要进行标准化，因为图像的各个维度已经在 [0, 255] 范围内
+    # img_np_normalized = (img_np_flat - np.mean(img_np_flat)) / np.std(img_np_flat)
+    # example["image1D"] = img_np_normalized
+
     # raise NotImplementedError("请完成data_preprocess函数")
     return example
 
@@ -41,8 +45,9 @@ class PCA:
         每个主成分的方差贡献比例。
     """
 
-    def __init__(self, n_components: int = 2) -> None:
+    def __init__(self, n_components: int = 2, full_matrices: bool = False) -> None:
         self.n_components = n_components
+        self.full_matrices = full_matrices
         self.mean_: np.ndarray = None  # type: ignore
         self.components_: np.ndarray = None  # type: ignore
         self.explained_variance_: np.ndarray = None  # type: ignore
@@ -60,7 +65,7 @@ class PCA:
         self.mean_ = np.mean(X, axis=0)
         Xc = X - self.mean_
         
-        U, S, VT = np.linalg.svd(Xc, full_matrices=False)
+        U, S, VT = np.linalg.svd(Xc, full_matrices=self.full_matrices)
         self.components_ = VT[:self.n_components]
         
         N = X.shape[0]
@@ -224,7 +229,7 @@ class GMM:
 
         # raise NotImplementedError("完成 GMM._mstep 方法")
 
-    def fit(self, X: np.ndarray) -> "GMM":
+    def fit(self, X: np.ndarray, callback=None) -> "GMM":
         rng = self._rng()
         X = np.asarray(X, dtype=np.float64)
         N, D = X.shape
@@ -251,12 +256,28 @@ class GMM:
             self._mstep(X, resp)
             self.n_iter_ = it
             improvement = (lower - prev_lower) / (abs(prev_lower) + 1e-12)
-            print(f"Iteration {it}, lower bound: {lower:.6f}, improvement: {improvement:.6f}")
+            # print(f"Iteration {it}, lower bound: {lower:.6f}, improvement: {improvement:.6f}")
+            
+            if callback:
+                callback(self, it, improvement)
+
             if improvement < self.tol:
                 self.converged_ = True
                 break
             prev_lower = lower
         self.lower_bound_ = lower
+
+        if False: # 计算 Davies-Bouldin 分数
+            # Calculate the Davies-Bouldin Index on original 784 dimensional space
+            from sklearn.metrics import davies_bouldin_score
+            labels = self.predict(X)
+            from datasets import load_from_disk
+            from dataloader import MNISTLoader
+            loader = MNISTLoader()
+            dataset = loader.load()
+            trainset = dataset["train"]
+            X = np.stack(trainset["image1D"]).astype(np.float64)
+            print(f"Davies-Bouldin Index: {davies_bouldin_score(X, labels):.4f}")
         return self
 
     def predict_proba(self, X: np.ndarray) -> np.ndarray:

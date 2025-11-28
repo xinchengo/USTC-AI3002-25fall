@@ -19,8 +19,9 @@ def main():
     print("Loading data...")
     loader = MNISTLoader()
     dataset = loader.load()
-    test_data = dataset["test"]
-    test_data_raw1d = test_data["image1D"]
+    # train_data = dataset["test"]
+    train_data = dataset["train"]
+    train_data_raw1d = train_data["image1D"]
     
     # Normalize data if needed (usually GMM expects float data, and visualization.py didn't seem to normalize explicitly other than what might be in data_preprocess, but let's check submission.py's data_preprocess again. Wait, submission.py's data_preprocess just flattens. Usually pixel values are 0-255. PCA/GMM might handle it, but usually 0-1 is better. However, I should follow what train.py does.)
     
@@ -48,14 +49,14 @@ def main():
         pca = PCA.from_pretrained(pca_path)
         
         print("Transforming data with PCA...")
-        test_data_reduced = pca.transform(test_data_raw1d)
+        train_data_reduced = pca.transform(train_data_raw1d)
         
         print("Loading GMM model...")
         gmm_path = os.path.join(args.results_path, "gmm")
         gmm = GMM.from_pretrained(gmm_path)
         
         print("Predicting clusters...")
-        labels = gmm.predict(test_data_reduced)
+        labels = gmm.predict(train_data_reduced)
         
     elif dr_method == 'autoencoder':
         print("Loading Autoencoder model...")
@@ -65,15 +66,15 @@ def main():
         print("Transforming data with Autoencoder...")
         # AE expects 2D images (N, 1, 28, 28) or similar, check train.py
         # train.py: traindata_raw = np.stack(trainset["image2D"])
-        test_data_2d = np.stack(test_data["image2D"])
-        test_data_reduced = ae_encode(ae, test_data_2d)
+        train_data_2d = np.stack(train_data["image2D"])
+        train_data_reduced = ae_encode(ae, train_data_2d)
         
         print("Loading GMM model...")
         gmm_path = os.path.join(args.results_path, "gmm")
         gmm = GMM.from_pretrained(gmm_path)
         
         print("Predicting clusters...")
-        labels = gmm.predict(test_data_reduced)
+        labels = gmm.predict(train_data_reduced)
     else:
         print(f"Unknown dimensionality reduction method: {dr_method}")
         return
@@ -84,9 +85,12 @@ def main():
     # "我们在原始数据空间 (784 维) 中使用 davies_bouldin_score度量聚类的性能"
     
     # Note: davies_bouldin_score might be slow on full dataset.
-    score = davies_bouldin_score(test_data_raw1d, labels)
+    score = davies_bouldin_score(train_data_raw1d, labels)
     
-    print(f"Davies-Bouldin Score: {score:.4f}")
+    print(f"Davies-Bouldin Score on 784 dim Euclidean space: {score:.4f}")
+
+    score_orig = davies_bouldin_score(train_data_raw1d, train_data["label"])
+    print(f"Davies-Bouldin Score on 784 dim with original label: {score_orig:.4f}")
 
 if __name__ == "__main__":
     main()
