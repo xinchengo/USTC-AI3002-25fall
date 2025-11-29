@@ -1,5 +1,19 @@
 # USTC-AI3002-25fall
 
+This repository contains my implementation of the homework and lab exercises for the course *AI3002: Fundamentals of Artificial Intelligence and Machine Learning* at [University of Science and Technology of China](https://ustc.edu.cn/).
+
+My primary working branch is a private fork hosted on [USTC LUG Gitlab](https://git.lug.ustc.edu.cn/) and updated in real time.
+
+As a balance between fairness and openness, this repository will not contain the code for any lab or homework before its deadline.
+
+该存储库包含我在中国科学技术大学《人工智能与机器学习基础》课程中实验和作业的源码。
+
+我的工作分支托管在[校 Linux 用户协会](https://lug.ustc.edu.cn/)的 Gitlab 存储库中。
+
+为了平衡公平性和开放性，我将在每次实验截止后再公开我的源代码。
+
+---------
+
 欢迎同学们修读**人工智能与机器学习基础**课程，这里是课程仓库，包含所有实验资料和书面作业。
 
 
