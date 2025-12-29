@@ -64,7 +64,7 @@ DM-SNR 曲线和积分脉冲轮廓都能反映脉冲星的性质：真实的脉�
 
 \section{代码补全情况说明}
 
-补全了 \verb|submission.py| 中挖空的地方。
+补全了 \verb|submission.py| 中挖空的地方；书写了 \verb|visualize.ipynb| 以绘制部分图表。
 
 \section{可视化结果}
 
@@ -241,11 +241,45 @@ $C$ 越大，模型能“容忍”的误分类越少，支持向量越少，其�
 
 \section{代码补全情况说明}
 
-\section{可视化结果}
+补全了 \verb|decision_tree.ipynb| 中挖空的地方。
 
-\section{思考题回答}
+\section{实验经过}
 
-\section{思考与难点}
+该节主要讲述我补全 \verb|decision_tree.ipynb| 的简要结果以及我对决策树原理的简要介绍。
+
+\subsection{原理}
+
+决策树，顾名思义是对决策过程的树形建模：每个结点按照一个相对简单的标准将数据分成两组或多组；以此形成递归的决策结构；
+
+常用的决策树算法往往会做以下的妥协：
+
+\begin{itemize}
+    \setlength{\itemsep}{0em}
+    \item 每个结点（也被称为 Decision Stump）只对一个特征进行分类——这样得到的决策树具有更强的{\bf 可解释性}；斜决策树（oblique decision tree）放宽了这一限制；
+    \item 贪心构造，对每个结点，优先选择本次分裂后最优化某种{\bf 分类判据}的特征；这样就避免了最优决策树（Optimal Decision Tree, ODT）的求解（它是 NP-完全的）；比如 ID3 算法就以熵增最大化（entropy gain）作为分裂判据；
+\end{itemize}
+
+更多的介绍在此处省略，可以参考\href{https://xinchengo.github.io/blog-zh/2025/12/23/%E6%94%AF%E6%8C%81%E5%90%91%E9%87%8F%E6%9C%BA%E5%86%B3%E7%AD%96%E6%A0%91%E4%B8%8E%E9%9B%86%E6%88%90%E5%AD%A6%E4%B9%A0/#%E5%86%B3%E7%AD%96%E6%A0%91}{我的博客中“决策树”部分的章节}。
+
+\subsection{实验经过}
+
+补全实验代码的过程较为顺利。实验代码的实现中稍微复习了 \verb|numpy| 一些基本操作的运用。
+
+得到的结果完美区分了 10 项数据，最后一个单元格的输出如下所示：
+
+\begin{verbatim}
+     Depth 0, Root: Split on feature: 2
+    - Depth 1, Left: Split on feature: 0
+      -- Left leaf node with indices [0, 1, 4, 7]
+      -- Right leaf node with indices [5]
+    - Depth 1, Right: Split on feature: 1
+      -- Left leaf node with indices [8]
+      -- Right leaf node with indices [2, 3, 6, 9]
+\end{verbatim}
+
+\section{额外探索}
+
+目前我暂未进行额外的探索。
 
 \chapter{集成学习实验}
 
