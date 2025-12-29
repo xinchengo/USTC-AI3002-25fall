@@ -22,7 +22,15 @@ def rbf_kernel(X1, X2, gamma):
         ||x - z||^2 = x^2 + z^2 - 2 x z^T
     """
     
-    raise NotImplementedError
+    # X1: (n1, d)
+    # X2: (n2, d)
+    # result: (n1, n2)
+    dist_sq = (
+        (X1 ** 2).sum(1, keepdims=True)
+        + (X2 ** 2).sum(1, keepdims=True).T
+        - 2 * X1 @ X2.T
+    )
+    return np.exp(-gamma * dist_sq) 
 
 
 def poly_kernel(X1, X2, degree=3, coef0=1.0, gamma=1.0):
@@ -35,7 +43,9 @@ def poly_kernel(X1, X2, degree=3, coef0=1.0, gamma=1.0):
         2. 按公式实现 poly kernel
     """
     
-    raise NotImplementedError
+    # X1: (n1, d)
+    # X2: (n2, d)
+    return (gamma * np.dot(X1, X2.T)) ** degree
 
 # ================================================================
 # 2. Kernel 管理器
@@ -109,7 +119,12 @@ class KernelSVM(BaseEstimator, ClassifierMixin):
             2. 调用 kernel_manager.compute(X, X) 计算核矩阵 K_train
             3. 使用 self.model.fit(K_train, y)
         """
-        raise NotImplementedError
+        self.X_train = X
+        K_train = self.kernel_manager.compute(X, X)
+        self.model.fit(K_train, y)
+
+        # print(f"[submission.py] Trained KernelSVM with kernel={self.kernel}")
+        # print(f"[submission.py] Number of support vectors: {self.model.n_support_}")
 
     def predict(self, X):
         """
@@ -117,7 +132,8 @@ class KernelSVM(BaseEstimator, ClassifierMixin):
             1. 计算 K_test = K(X_test, X_train)
             2. self.model.predict(K_test)
         """
-        raise NotImplementedError
+        K_test = self.kernel_manager.compute(X, self.X_train)
+        return self.model.predict(K_test)
 
     def predict_proba(self, X):
         """
@@ -125,7 +141,8 @@ class KernelSVM(BaseEstimator, ClassifierMixin):
             1. 同上，计算 K_test
             2. self.model.predict_proba(K_test)
         """
-        raise NotImplementedError
+        K_test = self.kernel_manager.compute(X, self.X_train)
+        return self.model.predict_proba(K_test)
 
 
 # ================================================================
@@ -146,8 +163,21 @@ class GridSearchSVM:
 
     def fit(self, X, y):
         # TODO: 完成 param_grid
-        # param_grid = {...}
-        raise NotImplementedError
+        param_grid = {
+            'C': [0.1, 1, 10, 100],
+            'gamma': ['scale', 0.1, 0.01],
+            'kernel': ['rbf', 'poly', 'linear'],
+        }
+        from sklearn.model_selection import GridSearchCV
+        self.best_model = GridSearchCV(
+            estimator=KernelSVM(),
+            param_grid=param_grid,
+            scoring='f1',
+            cv=self.kfold,
+            return_train_score=False,
+            n_jobs=-1
+        )
+        self.best_model.fit(X, y)
 
     def predict(self, X):
         return self.best_model.predict(X)
@@ -179,4 +209,9 @@ def get_student_model(method, args):
         补全上述逻辑
     """
 
-    raise NotImplementedError
+    if method in {'linear', 'rbf', 'poly', 'kernel_custom'}:
+        return KernelSVM(method, C=args.C, gamma=args.gamma, degree=args.degree)
+    elif method == 'grid':
+        return GridSearchSVM(kfold=args.kfold)
+    else:
+        return ValueError(f"Undefined method {method}")

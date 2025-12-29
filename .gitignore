@@ -217,3 +217,5 @@ saves/
 .vscode/
 /LABs/LAB2/code/data/
 /LABs/LAB2/code/results/
+/LABs/LAB3/SVM/results/
+/LABs/LAB3/assets/*.pdf

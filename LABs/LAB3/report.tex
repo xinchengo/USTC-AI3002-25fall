@@ -1,0 +1,265 @@
+% the pdf attachments are generated with 
+% - visualize.ipynb within ./SVM/
+
+\documentclass{ctexbook}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage[unicode]{hyperref}
+\usepackage{geometry}
+\geometry{a4paper, left=1in, right=1in, top=1in, bottom=1in}
+\usepackage{minted}
+
+\title{《人工智能与机器学习基础》第三次实验报告}
+\author{PB24000150 李欣宸}
+
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\chapter{支持向量机实验}
+
+\section{实验原理}
+
+\subsection{HTRU2 数据集}
+
+作为“中国物理大学”的学生，我们有理由弄清楚本实验使用的 HTRU2 数据集\cite{htru2_372}是什么。
+
+脉冲星一般由射电望远镜探测得到，“中国天眼”就是射电望远镜中的一个典型。截至 2024 年 11 月，“天眼”已经发现超过 1000 颗脉冲星，典型的检测流程是这样的：
+
+\begin{itemize}
+    \item 先假定不同的{\bf 色散量}（Dispersion Measure, DM），对收集到的信号进行色散矫正；
+    
+    脉冲星发出的信号包含很广的波段，由于宇宙空间中有很多等离子体，这些波段在到达地球的过程中会发生色散现象；矫正后我们才能得到其真正的光度曲线；
+
+    当假定的色散量与真实色散量相同的时候，信噪比最高；假定色散量和去色散后信噪比之间的曲线，我们称为{\bf 色散量-信噪比曲线}（Dispersion Measure--Signal to Noise Ratio Curve, DM-SNR curve）；
+
+    \item 综合脉冲星多个周期的信号，得到{\bf 积分脉冲轮廓}（Integrated Pulse Profile），注意它不是 \ref{fig:rotating-pulsar} 的光度曲线；积分轮廓的均值、标准差对应其“亮度”作为总体得到的统计量。
+\end{itemize}
+
+DM-SNR 曲线和积分脉冲轮廓都能反映脉冲星的性质：真实的脉冲星 DM-SNR 曲线应符合某种性质（用物理方法得到）；积分脉冲轮廓在亮度极低处有一个较为明显的峰（峰度系数大，极度左偏，偏度系数大），因为脉冲星光度大的时刻非常短暂。
+
+数据集包括：
+
+\begin{itemize}
+    \setlength{\itemsep}{0em}
+    \item 积分轮廓的均值、标准差、峰度系数（kurtosis）、偏度系数（skewness）；
+    \item DM-SNR 曲线的均值、标准差、峰度系数、偏度系数；
+\end{itemize}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.3\textwidth]{assets/pulsar.jpg}
+    \label{fig:rotating-pulsar}
+    \caption{脉冲星光度曲线的形成}
+    （来源：维基百科）
+\end{figure}
+
+\subsection{支持向量机}
+
+可以参考\href{https://xinchengo.github.io/blog-zh/2025/12/23/%E6%94%AF%E6%8C%81%E5%90%91%E9%87%8F%E6%9C%BA%E5%86%B3%E7%AD%96%E6%A0%91%E4%B8%8E%E9%9B%86%E6%88%90%E5%AD%A6%E4%B9%A0/#%E6%94%AF%E6%8C%81%E5%90%91%E9%87%8F%E6%9C%BA}{我的博客中“支持向量机”部分}的内容。
+
+\section{代码补全情况说明}
+
+补全了 \verb|submission.py| 中挖空的地方。
+
+\section{可视化结果}
+
+\subsection{数据集可视化}
+
+加载 \verb|pulsar.csv| 可以使用 Pandas 库；观察到数据集中有较多（25.98\%）的样本在某些特征上存在缺失值（NaN）。题目附带的 \verb|dataloader.py| 中已经包含了用中位数填充缺失值的代码。
+
+我的可视化代码见 \verb|visualize.ipynb|。
+
+\subsubsection{特征的分布和相关性}
+
+研究特征分布时对每个特征忽略了 NaN 值（我们猜想其真实值分布与正常值相近）。
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=1.0\textwidth]{assets/feature_distributions.pdf}
+    \vspace{-3em}
+    \caption{各特征的分布直方图}
+    \label{fig:feature-distributions}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{assets/correlation_heatmap.pdf}
+    \vspace{-1.5em}
+    \caption{各特征的相关性热力图}
+    \label{fig:correlation-heatmap}
+\end{figure}
+
+图 \ref{fig:correlation-heatmap} 可以看到，所有特征可以比较好地划分为两组（第一组积分轮廓的均值标准差和 DM-SNR 曲线的峰度偏度，第二组其他），组内成正相关，组间成负相关；第一组与结果大致呈负相关，第二组与结果大致呈正相关。其中以两组峰度、偏度系数间的相关性最为显著。
+
+与分类相关性最大的特征是积分轮廓的峰度系数（79\%）、积分轮廓的偏度系数（71\%）、积分曲线的均值（-68\%）；这三点都由真实脉冲星积分轮廓极度左偏的形状决定。
+
+\subsubsection{PCA 降维}
+
+PCA 使用了 \verb|feature_engineering.py| 中的 \verb|PCAProjector|。
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.6\textwidth]{assets/pca_scatter.pdf}
+    \vspace{-1.5em}
+    \caption{PCA 降维后前两主成分的散点图}
+    \label{fig:pca-scatter}
+\end{figure}
+
+可以看出，降维后的负样本形如一个高斯椭球，正样本分布形如椭圆但没有明显中心。前两维度可以较好地区分绝大多数正负样本。
+
+\subsection{线性核 SVM 的可视化} \label{sec:linear-svm-visualization}
+
+本节探讨超参数 $C$ 对软间隔 SVM 决策的影响。由于样本太多（见 \ref{para:about-dataset-quality}），难以直观感受，因此本届的可视化实验都是用随机抽取的 500 个样本进行的。
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{assets/svm_linear_kernel_decision_boundaries.pdf}
+    \vspace{-1.5em}
+    \caption{不同 C 值下线性核 SVM 的决策边界}
+    \label{fig:svm-linear-decision-boundaries}
+\end{figure}
+
+由 \ref{fig:svm-linear-decision-boundaries} 可见，随着 $C$ 值增大，间隔和支持向量数目均减小。
+
+这其实可以从软间隔 SVM 的目标函数 \eqref{eq:soft-margin-svm} 理解：
+
+\begin{equation}
+\begin{matrix}
+\displaystyle \min_{w,b,\zeta} & \displaystyle \frac{1}{2}\|w\|^2+C\sum_{i=1}^n\zeta_i^2 \\
+\text{s.t.} &  y_i(w^Tx_i+b)\ge 1 - \zeta_i,~\zeta_i \ge 0
+\end{matrix}
+\label{eq:soft-margin-svm}
+\end{equation}
+
+$C$ 越大，模型能“容忍”的误分类越少，支持向量越少，其决策边界越受少量局部向量的影响。若数据中有较多噪声点，$C$ 过大会导致过拟合；比如上图中 $C=10^6$ 时，F1 分数略有下降；对比 $C=5$ 时，红、蓝色的支持向量涵盖整个红、蓝交界的区域，$C=10^6$ 时，支持向量集中在红、蓝交界中心处。
+
+\subsection{非线性核 SVM 的可视化} \label{sec:nonlinear-svm-visualization}
+
+本节探讨核函数类型和超参数 $\gamma$ 对 SVM 决策的影响。如图结论：
+
+\begin{itemize}
+    \setlength{\itemsep}{0em}
+    \item  $d\nearrow~\implies$ 决策边界复杂性 $\nearrow,~\mathrm{\#NS}\searrow$（见图 \ref{fig:svm-poly-decision-boundaries}）； 
+    \item $\gamma \nearrow~\implies$ 决策边界复杂性 $\nearrow,~\mathrm{\#NS}\searrow$（见图 \ref{fig:svm-rbf-decision-boundaries}）。
+\end{itemize}
+
+\subsubsection{多项式核 SVM 的可视化} \label{sec:polynomial-kernel-svm-visualization}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{assets/svm_poly_kernel_decision_boundaries.pdf}
+    \vspace{-1.5em}
+    \caption{不同 degree 值下多项式核 SVM 的决策边界}
+    （$C=5$ 固定）
+    \label{fig:svm-poly-decision-boundaries}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{assets/svm_rbf_kernel_decision_boundaries.pdf}
+    \vspace{-1.5em}
+    \caption{不同 $\gamma$ 值下 RBF 核 SVM 的决策边界}
+    （$C=5$ 固定）
+    \label{fig:svm-rbf-decision-boundaries}
+\end{figure}
+
+{
+\color{red}{待补充：degree 变大导致决策边界更复杂的原因}
+}
+
+\subsection{超参数调优可视化} \label{sec:hyperparameter-tuning-visualization}
+
+
+
+
+\section{思考题回答}
+
+\subsubsection{为什么 SVM 要最大化间隔？} 
+
+考虑对训练数据“加噪”，最大化间隔可以最大化模型对“噪声”的容错性。
+
+\subsubsection{C 越大越容易过拟合，为什么？}
+
+从直观的角度理解（也可参考 \ref{sec:linear-svm-visualization}）：
+\begin{gather*}
+    C \nearrow \implies \text{（由 \eqref{eq:soft-margin-svm}）对误分类的容忍度} \searrow \implies \mathrm{\#NS} \searrow \\
+    \implies \text{决策边界更受少量局部向量影响} \nearrow \implies \text{过拟合风险} \nearrow
+\end{gather*}
+
+\subsubsection{RBF 核中的 $\gamma$ 太大有什么问题}
+
+{
+    \color{red}
+    待补充：$\gamma$ 太大导致过拟合的原因
+}
+
+\subsubsection{为什么支持向量数少，模型更容易泛化？}
+
+
+这个命题其实并{\bf 不}总是成立，应当从两方面看待：
+\begin{itemize}
+    \setlength{\itemsep}{0em}
+    \item 一般模型复杂度 $\searrow \implies$ 支持向量数 $\searrow$，而较为简单的模型往往更容易泛化；
+    \item 但是对于同一类模型，当我们调整 $C\nearrow$，支持向量数 $\searrow$ 可能使模型更容易受到少量极端样本的影响，从而导致过拟合，泛化能力下降。
+\end{itemize}
+
+\paragraph{Polynomial 核的 degree 越大有什么影响？}
+
+{
+    \color{red}
+    待补充：degree 变大的数学解释
+}
+
+\section{思考与难点}
+
+\subsection{困惑与思考}
+
+\paragraph{关于“写好报告”的梦想与实践中的挫折}
+
+在听完郑悟强助教对实验一的讲解后我心潮澎湃，感受到这门课“写报告”的实际意义是培养我们的科学思维（实事求是，写好做每一步的原因，而不是盲目堆砌结果），所以我非常希望能把本次报告写好。
+
+本来以为本次实验“因为期中座谈会的原因”会比较简单，有较多能“自由发挥”的空间；结果发现实验虽然{\it 不难}，但是{\it 要求有些多}，\verb|SVM.md| 中密密麻麻地罗列需要附在实验报告中的图表，我花了一整天的时间才弄懂“到底要写什么”以及画出大部分图表；劳累一天下来，除了“失望”，只有“失望”。
+
+私以为本次实验最精华的部分在于理解{\it 什么样的核对应什么样的空间，以及这个希尔伯特空间的性质}；还有软分类 SVM 的效果与超参数 $C$ 的关系；五道思考题的后四道都与这两个核心问题有关。
+
+相反，画出图表的过程繁琐、机械、乏味，如果只借助 \verb|submission.py| 中的代码，需要手动执行多次 \verb|python --train.py --method <method>|，然后把结果整合到 \LaTeX 文档中；画完图表后，我觉得我已经失去了认真思考 SVM 的能力。
+
+\subsection{对实验的建议}
+
+\paragraph{关于数据集质量} \label{para:about-dataset-quality}
+
+实验中使用的 HTRU2 数据集是原始 \href{https://archive.ics.uci.edu/dataset/372/htru2}{HRU2 数据集}的一个 70\% 大小的一个子集，但是令人不解的是，数据集中有很多缺失值（25.98\% 的行存在 NaN 项），而原始 HRU2 数据集中就没有。
+
+数据规模太大，高度线性可分，导致超参数提升、核函数选择等对结果影响不大。而 SVM 主要优势在于处理小规模、高维度的数据集。
+
+\chapter{决策树实验}
+
+\section{代码补全情况说明}
+
+\section{可视化结果}
+
+\section{思考题回答}
+
+\section{思考与难点}
+
+\chapter{集成学习实验}
+
+\section{代码补全情况说明}
+
+\section{可视化结果}
+
+\section{思考题回答}
+
+\section{思考与难点}
+
+
+
+\bibliographystyle{plain} % We choose the "plain" reference style
+\bibliography{refs} % Entries are in the refs.bib file
+
+\end{document}
