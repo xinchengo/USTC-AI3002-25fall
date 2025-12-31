@@ -41,6 +41,7 @@ As a balance between fairness and openness, this repository will not contain the
 | LAB1 | 线性模型 | 2025.10.19 |
 | LAB2 | 无监督学习 | 2025.11.30 |
 | LAB3 | 监督学习 | 2025.12.31 |
+| Final Project | 强化学习 | 2026.1.31 |
 
 ## 作业
 | 作业次数 | 作业主题 | 截止日期 |
