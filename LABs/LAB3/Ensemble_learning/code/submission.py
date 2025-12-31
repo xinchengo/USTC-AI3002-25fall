@@ -154,7 +154,7 @@ class GBDTModel(BaseEstimator, ClassifierMixin):
         - 拟合回归树
         - 更新 F ← F + η f_t
     """
-    def __init__(self, n_estimators=50, learning_rate=0.1, max_depth=3):
+    def __init__(self, n_estimators=50, learning_rate=0.1, max_depth=1):
         self.n_estimators = n_estimators
         self.learning_rate = learning_rate
         self.max_depth = max_depth

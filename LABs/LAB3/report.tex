@@ -1,7 +1,7 @@
 % the pdf attachments are generated with 
 % - visualize.ipynb within ./SVM/
 
-\documentclass{ctexbook}
+\documentclass[oneside]{ctexbook}
 \usepackage{graphicx} % Required for inserting images
 \usepackage{amsmath}
 \usepackage{amssymb}
@@ -14,7 +14,7 @@
 \usepackage{enumitem}
 \setlist[itemize]{noitemsep}
 \setlist[enumerate]{noitemsep} % remove item separation for all lists
-
+\usepackage{titling}
 \title{《人工智能与机器学习基础》第三次实验报告}
 \author{PB24000150 李欣宸}
 
@@ -22,7 +22,16 @@
 
 \begin{document}
 
+\renewcommand{\maketitlehookd}{\begin{center}报告为了保持简短，没有包含数学推导过程。所有数学推导详见我的博客：
+
+    \href{https://xinchengo.github.io/blog-zh/2025/12/23/支持向量机决策树与集成学习/}{\tt https://xinchengo.github.io/blog-zh/2025/12/23/支持向量机决策树与集成学习/}
+
+    该博客是我在完成作业三和实验三的过程中同步编写的
+    \end{center}}
+
 \maketitle
+
+\tableofcontents
 
 \chapter{支持向量机实验}
 
@@ -30,7 +39,7 @@
 
 \subsection{HTRU2 数据集}
 
-作为“中国物理大学”的学生，我们有理由弄清楚本实验使用的 HTRU2 数据集\cite{htru2_372}是什么。
+作为“中国物理大学”的学生，我们有理由弄清楚本实验使用的 \href{https://archive.ics.uci.edu/dataset/372/htru2}{HTRU2 数据集}是什么。
 
 脉冲星一般由射电望远镜探测得到，“中国天眼”就是射电望远镜中的一个典型。截至 2024 年 11 月，“天眼”已经发现超过 1000 颗脉冲星，典型的检测流程是这样的：
 
@@ -63,11 +72,11 @@ DM-SNR 曲线和积分脉冲轮廓都能反映脉冲星的性质：真实的脉�
 
 \subsection{支持向量机}
 
-可以参考\href{https://xinchengo.github.io/blog-zh/2025/12/23/%E6%94%AF%E6%8C%81%E5%90%91%E9%87%8F%E6%9C%BA%E5%86%B3%E7%AD%96%E6%A0%91%E4%B8%8E%E9%9B%86%E6%88%90%E5%AD%A6%E4%B9%A0/#%E6%94%AF%E6%8C%81%E5%90%91%E9%87%8F%E6%9C%BA}{我的博客中“支持向量机”部分}的内容。
+可以参考\href{https://xinchengo.github.io/blog-zh/2025/12/23/%E6%94%AF%E6%8C%81%E5%90%91%E9%87%8F%E6%9C%BA%E5%86%B3%E7%AD%96%E6%A0%91%E4%B8%8E%E9%9B%86%E6%88%90%E5%AD%A6%E4%B9%A0/#%E6%94%AF%E6%8C%81%E5%90%91%E9%87%8F%E6%9C%BA}{我的博客中“支持向量机”部分}的内容。本篇报告中{\bf 不包含}数学推导过程，所有推导均在博客中给出。
 
 \section{代码补全情况说明}
 
-补全了 \verb|submission.py| 中挖空的地方；书写了 \verb|visualize.ipynb| 以绘制部分图表。
+补全了 \verb|submission.py| 中挖空的地方，并解决了一处错误（）；书写了 \verb|visualize.ipynb| 以绘制部分图表；修改了 \verb|visualization.py| 中关于热力图的细节。
 
 \section{实验结果和分析}
 
@@ -89,7 +98,7 @@ DM-SNR 曲线和积分脉冲轮廓都能反映脉冲星的性质：真实的脉�
     \label{fig:feature-distributions}
 \end{figure}
 
-\begin{figure}[htbp]
+\begin{figure}[t]
     \centering
     \includegraphics[width=0.8\textwidth]{assets/correlation_heatmap.pdf}
     \vspace{-1.5em}
@@ -105,7 +114,7 @@ DM-SNR 曲线和积分脉冲轮廓都能反映脉冲星的性质：真实的脉�
 
 PCA 使用了 \verb|feature_engineering.py| 中的 \verb|PCAProjector|。
 
-\begin{figure}[htbp]
+\begin{figure}[t]
     \centering
     \includegraphics[width=0.6\textwidth]{assets/pca_scatter.pdf}
     \vspace{-1.5em}
@@ -121,13 +130,13 @@ PCA 使用了 \verb|feature_engineering.py| 中的 \verb|PCAProjector|。
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.8\textwidth]{assets/svm_linear_kernel_decision_boundaries.pdf}
+    \includegraphics[width=0.99\textwidth]{assets/svm_all_kernel_decision_boundaries.pdf}
     \vspace{-1.5em}
-    \caption{不同 C 值下线性核 SVM 的决策边界}
-    \label{fig:svm-linear-decision-boundaries}
+    \caption{不同 C 值下三种核 SVM 的决策边界}
+    \label{fig:svm-all-kernel-decision-boundaries}
 \end{figure}
 
-由 \ref{fig:svm-linear-decision-boundaries} 可见，随着 $C$ 值增大，间隔和支持向量数目均减小。
+由 \ref{fig:svm-all-kernel-decision-boundaries} 可见，随着 $C$ 值增大，间隔和支持向量数目均减小。
 
 这其实可以从软间隔 SVM 的目标函数 \eqref{eq:soft-margin-svm} 理解：
 
@@ -143,44 +152,35 @@ $C$ 越大，模型能“容忍”的误分类越少，支持向量越少，其�
 
 \subsection{非线性核 SVM 的可视化} \label{sec:nonlinear-svm-visualization}
 
-本节探讨核函数类型和超参数 $\gamma$ 对 SVM 决策的影响。如图结论：
+本节探讨核函数类型和超参数 $d$（多项式核）$\gamma$（RBF 核）对 SVM 决策的影响。如图结论：
 
 \begin{itemize}
-    \item  $d\nearrow~\implies$ 决策边界复杂性 $\nearrow,~\mathrm{\#NS}\searrow$（见图 \ref{fig:svm-poly-decision-boundaries}）； 
-    \item $\gamma \nearrow~\implies$ 决策边界复杂性 $\nearrow,~\mathrm{\#NS}\searrow$（见图 \ref{fig:svm-rbf-decision-boundaries}）。
+    \item  $d\nearrow~\implies$ 决策边界复杂性 $\nearrow,~\mathrm{\#NS}\searrow$（见图 \ref{fig:svm-all-kernel-decision-boundaries}）； 
+    \item $\gamma \nearrow~\implies$ 决策边界复杂性 $\nearrow,~\mathrm{\#NS}\searrow$（见图 \ref{fig:svm-all-kernel-decision-boundaries}）。
+    \item 此外，当多项式核度数为偶数和奇数时，决策边界形状也有明显差异。
 \end{itemize}
 
-\subsubsection{多项式核 SVM 的可视化} \label{sec:polynomial-kernel-svm-visualization}
-
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.8\textwidth]{assets/svm_poly_kernel_decision_boundaries.pdf}
-    \vspace{-1.5em}
-    \caption{不同 degree 值下多项式核 SVM 的决策边界}
-    （$C=5$ 固定）
-    \label{fig:svm-poly-decision-boundaries}
-\end{figure}
-
-\begin{figure}[htbp]
-    \centering
-    \includegraphics[width=0.8\textwidth]{assets/svm_rbf_kernel_decision_boundaries.pdf}
-    \vspace{-1.5em}
-    \caption{不同 $\gamma$ 值下 RBF 核 SVM 的决策边界}
-    （$C=5$ 固定）
-    \label{fig:svm-rbf-decision-boundaries}
-\end{figure}
-
-{
-\color{red}{待补充：degree 变大导致决策边界更复杂的原因}
-}
+这是因为 $d$ 控制多项式核对应特征空间中多项式的次数，次数越高，模型越复杂；而 $\gamma$ 控制特征空间中，系数随次数和距离增加的衰减速率，$\gamma$ 越大，高次项对内积的贡献越大，模型越复杂。具体的数学解释见\href{https://xinchengo.github.io/blog-zh/2025/12/23/%E6%94%AF%E6%8C%81%E5%90%91%E9%87%8F%E6%9C%BA%E5%86%B3%E7%AD%96%E6%A0%91%E4%B8%8E%E9%9B%86%E6%88%90%E5%AD%A6%E4%B9%A0/#%E6%A0%B8%E5%87%BD%E6%95%B0%E4%B8%8E%E6%A0%B8%E6%8A%80%E5%B7%A7}{我的博客}。
 
 \subsection{超参数调优可视化} \label{sec:hyperparameter-tuning-visualization}
+
+我对 RBF 核 SVM 使用网格搜索（Grid Search）调优超参数 $C$ 和 $\gamma$，\ref{fig:grid_heatmap} 为 F1 分数热力图。可以看到，$C$ 的增大和 $\gamma$ 增大对模型起到的作用是相反的：$C$ 增大对模型复杂度起到约束作用，而 $\gamma$ 减少降低了高次项对内积的贡献，也降低模型复杂度。
+
+表现最优的点大致集中在一条直线上，我猜测是 $C$ 和 $\gamma$ 之间的相互作用造成的。
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.7\textwidth]{assets/grid_heatmap_f1.png}
+    \vspace{-1.5em}
+    \caption{RBF 核 SVM 超参数调优热力图}
+    \label{fig:grid_heatmap}
+\end{figure}
 
 \section{思考题回答}
 
 \subsubsection{为什么 SVM 要最大化间隔？} 
 
-考虑对训练数据“加噪”，最大化间隔可以最大化模型对“噪声”的容错性。
+考虑对训练数据“加噪”，最大化间隔可以最大化模型对“噪声”的容错性；如果我们考虑稍微“移动”一下决策边界，那么最大化间隔等同于最大化若要改变分类，决策边界需要移动的距离；注意上面这段分析有意义的前提是特征空间的“距离”有意义，以及噪声服从高斯假设。
 
 \subsubsection{C 越大越容易过拟合，为什么？}
 
@@ -192,10 +192,7 @@ $C$ 越大，模型能“容忍”的误分类越少，支持向量越少，其�
 
 \subsubsection{RBF 核中的 $\gamma$ 太大有什么问题}
 
-{
-    \color{red}
-    待补充：$\gamma$ 太大导致过拟合的原因
-}
+RBF 核的特征空间是无限维的，$\gamma$ 控制了高次项对内积的贡献；当 $\gamma$ 趋于无穷大时，模型的表示能力趋于无限强，直到把整个训练集都过拟合（如 \ref{fig:svm-all-kernel-decision-boundaries} 中 $\gamma=1$ 的情形）。
 
 \subsubsection{为什么支持向量数少，模型更容易泛化？}
 
@@ -206,12 +203,9 @@ $C$ 越大，模型能“容忍”的误分类越少，支持向量越少，其�
     \item 但是对于同一类模型，当我们调整 $C\nearrow$，支持向量数 $\searrow$ 可能使模型更容易受到少量极端样本的影响，从而导致过拟合，泛化能力下降。
 \end{itemize}
 
-\paragraph{Polynomial 核的 degree 越大有什么影响？}
+\subsubsection{Polynomial 核的 degree 越大有什么影响？}
 
-{
-    \color{red}
-    待补充：degree 变大的数学解释
-}
+\href{https://xinchengo.github.io/blog-zh/2025/12/23/%E6%94%AF%E6%8C%81%E5%90%91%E9%87%8F%E6%9C%BA%E5%86%B3%E7%AD%96%E6%A0%91%E4%B8%8E%E9%9B%86%E6%88%90%E5%AD%A6%E4%B9%A0/#%E6%A0%B8%E5%87%BD%E6%95%B0%E4%B8%8E%E6%A0%B8%E6%8A%80%E5%B7%A7}{由数学解释}，degree 越大，模型的表示能力越强，决策边界越复杂；但是可以通过增加常数项 $c$ 来控制模型复杂度。
 
 \section{思考与难点}
 
@@ -221,11 +215,9 @@ $C$ 越大，模型能“容忍”的误分类越少，支持向量越少，其�
 
 在听完郑悟强助教对实验一的讲解后我心潮澎湃，感受到这门课“写报告”的实际意义是培养我们的科学思维（实事求是，写好做每一步的原因，而不是盲目堆砌结果），所以我非常希望能把本次报告写好。
 
-本来以为本次实验“因为期中座谈会的原因”会比较简单，有较多能“自由发挥”的空间；结果发现实验虽然{\it 不难}，但是{\it 要求有些多}，\verb|SVM.md| 中密密麻麻地罗列需要附在实验报告中的图表，我花了一整天的时间才弄懂“到底要写什么”以及画出大部分图表；劳累一天下来，除了“失望”，只有“失望”。
+可视化决策边界的过程是实验最精华的部分。但是按照报告要求画出各类图表的过程让我觉得有些繁琐；\verb|visualization.py| 中的代码有少量错误且不能涵盖所有画图需求，要真的花好图需要自己写一个 Jupyter NoteBook。
 
-私以为本次实验最精华的部分在于理解{\it 什么样的核对应什么样的空间，以及这个希尔伯特空间的性质}；还有软分类 SVM 的效果与超参数 $C$ 的关系；五道思考题的后四道都与这两个核心问题有关。
-
-相反，画出图表的过程繁琐、机械、乏味，如果只借助 \verb|submission.py| 中的代码，需要手动执行多次 \verb|python --train.py --method <method>|，然后把结果整合到 \LaTeX 文档中；画完图表后，我觉得我已经失去了认真思考 SVM 的能力。
+\paragraph{代码错误} \verb|submission.py| 有错，\verb|KernelSVM| 的 \verb|KernelManager| 应在 \verb|fit| 中声明而不是在 \verb|__init__| 中声明；因为 \verb|GridSearchCV| 中只会创建一个 \verb|KernelSVM| 实例，改变参数使用的是 \verb|BaseEstimator| 中的 \verb|set_params| 方法；\verb|KernelManager| 只会被初始化一次，导致不同核函数的 SVM 都使用了同一个核函数。
 
 \subsection{对实验的建议}
 
@@ -258,7 +250,7 @@ $C$ 越大，模型能“容忍”的误分类越少，支持向量越少，其�
 
 更多的介绍在此处省略，可以参考\href{https://xinchengo.github.io/blog-zh/2025/12/23/%E6%94%AF%E6%8C%81%E5%90%91%E9%87%8F%E6%9C%BA%E5%86%B3%E7%AD%96%E6%A0%91%E4%B8%8E%E9%9B%86%E6%88%90%E5%AD%A6%E4%B9%A0/#%E5%86%B3%E7%AD%96%E6%A0%91}{我的博客中“决策树”部分的章节}。
 
-\subsection{实验经过}
+\subsection{实验结果}
 
 补全实验代码的过程较为顺利。实验代码的实现中稍微复习了 \verb|numpy| 一些基本操作的运用。
 
@@ -274,45 +266,49 @@ $C$ 越大，模型能“容忍”的误分类越少，支持向量越少，其�
       -- Right leaf node with indices [2, 3, 6, 9]
 \end{verbatim}
 
-\section{额外探索}
-
-目前我暂未进行额外的探索。
-
 \chapter{集成学习实验}
 
 \section{代码补全情况说明}
 
-补全了 \verb|submission.py| 中挖空的地方；书写了 \verb|visualize.ipynb| 以绘制部分图表。
+补全了 \verb|submission.py| 中挖空的地方（包括拓展实验）；书写了 \verb|visualize.ipynb| 以绘制部分图表；修改了 \verb|visualization.py| 的部细节；在 \verb|train.py| 添加了随机种子设置。
+
+\verb|create_fig.sh| 是用于生成实验所需图表的自动化脚本。
+
+\section{实验原理}
+
+我在\href{https://xinchengo.github.io/blog-zh/2025/12/23/%E6%94%AF%E6%8C%81%E5%90%91%E9%87%8F%E6%9C%BA%E5%86%B3%E7%AD%96%E6%A0%91%E4%B8%8E%E9%9B%86%E6%88%90%E5%AD%A6%E4%B9%A0/#%E9%9B%86%E6%88%90%E5%AD%A6%E4%B9%A0}{博客}中书写了一部分数学公式的推导，可作参考。
 
 \section{实验结果和分析}
 
-\subsection{数据集可视化}
-
 \subsection{混淆矩阵} \label{sec:confusion-matrix}
 
-图 \ref{fig:confusion-matrix} 展示了三种集成学习方法在测试集上的混淆矩阵。
+图 \ref{fig:confusion-matrix} 展示了五种集成学习方法在测试集上的混淆矩阵。
 
-\begin{figure}[htbp]
+\begin{figure}[hb]
     \centering
     \includegraphics[width=0.32\textwidth]{assets/voting_cm.png}
     \includegraphics[width=0.32\textwidth]{assets/bagging_cm.png}
     \includegraphics[width=0.32\textwidth]{assets/adaboost_cm.png}
+    \includegraphics[width=0.32\textwidth]{assets/gbdt_cm.png}
+    \includegraphics[width=0.32\textwidth]{assets/stacking_cm.png}
     \vspace{-1.5em}
-    \caption{三种集成学习方法的混淆矩阵}
+    \caption{五种集成学习方法的混淆矩阵}
     \label{fig:confusion-matrix}
 \end{figure}
 
 通过混淆矩阵可以得到各方法的准确率和 F1 分数，见表 \ref{tab:overall-performance}。
 
-\begin{table}[htbp]
+\begin{table}[t]
     \centering
     \begin{tabular}{lcc}
         \hline
         方法 & 准确率 & F1 分数 \\
         \hline
         Voting & 0.9737 & 0.9735 \\
-        Bagging & 0.9386 & 0.9387 \\
+        Bagging & 0.9561 & 0.9560 \\
         AdaBoost & 0.9561 & 0.9558 \\
+        GBDT & 0.9386 & 0.9384 \\
+        Stacking & 0.9825 & 0.9825 \\
         \hline
     \end{tabular}
     \caption{三种集成学习方法的整体性能对比}
@@ -323,15 +319,67 @@ $C$ 越大，模型能“容忍”的误分类越少，支持向量越少，其�
 
 图 \ref{fig:adaboost-training-error} 展示了 AdaBoost 在训练集上的误差下降曲线。
 
-\begin{figure}[htbp]
+\begin{figure}[t]
     \centering
-    \includegraphics[width=0.8\textwidth]{assets/adaboost_training_curve.png}
+    \includegraphics[width=0.7\textwidth]{assets/adaboost_training_curve.png}
     \vspace{-1.5em}
-    \caption{AdaBoost 训练误差下降曲线}
+    \caption{AdaBoost 的训练误差下降曲线}
     \label{fig:adaboost-training-error}
 \end{figure}
 
-训练误差随着弱学习器数量的增长快速下降到 0（26 个弱学习器时），我们猜测模型发生了过拟合，进一步验证需要{\it 交叉验证}（绝对不能用测试集），以及{\it 可视化决策边界}。
+训练误差随着弱学习器数量的增长快速下降到 0（26 个弱学习器时），我们猜测模型发生了过拟合，下面我们使用{\it 交叉验证}（绝对不能用测试集）和{\it 可视化决策边界}两种方法进行验证，结果显示没有发生明显的过拟合。
+
+\subsubsection{交叉验证的结果}
+
+我使用 5 折交叉验证评估了不同弱学习器数量下 AdaBoost 的表现，指标选取验证集上的准确率和 F1 分数（图 \ref{fig:adaboost-cv-performance}），随着学习器数量的增加，模型表现虽略有波动，但总体较为稳定，没有发生明显的过拟合。这与课上“AdaBoost 对过拟合有较强的稳健性”结论一致。
+
+\subsubsection{可视化决策边界}
+
+可以看到，学习器数量增加后，决策边界仍然简单，清晰，没有明显过拟合的迹象（图 \ref{fig:adaboost-decision-boundaries}）。
+
+
+\subsection{简化版 GBDT 的性质}
+
+本实验中使用的简化版 GBDT 用学习率取代了线搜索，其性能不如 AdaBoost（见表 \ref{tab:overall-performance}）；决策边界可视化表明决策边界复杂性受学习率影响很大（图 \ref{fig:gbdt-decision-boundaries}）：
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.48\textwidth]{assets/adaboost_cv_accuracy.pdf}
+    \includegraphics[width=0.48\textwidth]{assets/gbdt_cv_loss.pdf}
+    \vspace{-1.5em}
+    \caption{不同弱学习器数量下 AdaBoost 和 GBDT 的交叉验证表现}
+    \label{fig:adaboost-cv-performance}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{assets/adaboost_decision_boundaries.pdf}
+    \vspace{-1.5em}
+    \caption{不同弱学习器数量下 AdaBoost 的决策边界}
+    \label{fig:adaboost-decision-boundaries}
+\end{figure}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{assets/gbdt_decision_boundaries.pdf}
+    \vspace{-1.5em}
+    \caption{不同学习率下 GBDT 的决策边界}
+    \label{fig:gbdt-decision-boundaries}
+\end{figure}
+
+\begin{itemize}
+    \item 学习率较大时，决策边界变得曲折；但是模型没有发生过拟合（见图 \ref{fig:adaboost-cv-performance}）；这是因为较大的学习率让每次迭代的“步子”变大，容易出现“矫枉过正”的现象。
+    \item 两种学习率下，模型都是欠拟合；
+\end{itemize}
+
+可视化中使用的所有 GBDT 中弱学习器均采取最大深度为 1 的决策树（Decision Stump）。
+
+
+
+\begin{figure}
+    
+\end{figure}
+
 
 
 
@@ -381,7 +429,7 @@ AdaBoost 是 Gradient Boosting 中使用指数损失的特殊形式；所以要�
     \item 本题中我们使用的交叉熵损失：$\ell (y, F) = \log(1 + e^{-yF})$；
 \end{itemize}
 
-交叉熵损失相比指数损失更加“平缓”，相比指数损失，对噪声的容忍度更高，因此在训练步数较少时能有更“好”的决策边界。{\color{red} 需要实验验证}
+交叉熵损失相比指数损失更加“平缓”，相比指数损失，对噪声的容忍度更高，因此在训练步数较少时能有更“好”的决策边界。但是本实验中{\bf 简化版}的 GBDT 和真正（使用线搜索）的 GBDT 是有很大差别的，所以实验结果难以很好反映两者的差异。
 
 \subsubsection{Stacking 的元学习器}
 
@@ -399,7 +447,6 @@ AdaBoost 是 Gradient Boosting 中使用指数损失的特殊形式；所以要�
     \item Stacking 模型有较强的可解释性（回归系数的大小）；
     \item Stacking 模型一般表现强于任何一个基学习器，表现好；
     \item Stacking 模型较 Boosting、Bagging 结构较为复杂，较难调整和优化；
-    \item 
 \end{itemize}
 
 \subsection{集成学习与单一模型是否更适合作为医学诊断模型}
@@ -421,8 +468,5 @@ AdaBoost 是 Gradient Boosting 中使用指数损失的特殊形式；所以要�
 \paragraph{细节决定成败} 我在补全代码时曾将一处向量逐点乘 \verb|a * b| 写成了点乘 \verb|np.dot(a, b)|，导致 AdaBoost 训练误差下降曲线是平的；此外，标签 $\{0,1\}$ 和 $\{-1,1\}$ 的转换也有很多要注意的细节。
 
 \paragraph{集成学习思想} 实验加深了我对集成学习思想的理解；Bagging 的思想来源于统计中的“自助法”；Boosting 的本质是泛函最值问题，大部分算法都可以归结到函数空间上的牛顿法（XGBoost）和梯度下降法（Gradient Boosting）；Stacking 方法和当今大模型中常用的 MoE（Mixture of Expert）架构有类似的地方。
-
-\bibliographystyle{plain} % We choose the "plain" reference style
-\bibliography{refs} % Entries are in the refs.bib file
 
 \end{document}

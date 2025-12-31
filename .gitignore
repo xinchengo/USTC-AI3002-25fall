@@ -219,4 +219,5 @@ saves/
 /LABs/LAB2/code/results/
 /LABs/LAB3/SVM/results/
 /LABs/LAB3/assets/*.pdf
+/LABs/LAB3/assets/*_cm.png
 /LABs/LAB3/Ensemble_learning/results/

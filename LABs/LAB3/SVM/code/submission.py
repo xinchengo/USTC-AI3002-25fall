@@ -103,13 +103,6 @@ class KernelSVM(BaseEstimator, ClassifierMixin):
         self.gamma = gamma
         self.degree = degree
         self.coef0 = coef0
-
-        self.kernel_manager = KernelManager(
-            kernel=kernel, gamma=gamma,
-            degree=degree, coef0=coef0
-        )
-
-        self.model = SVC(kernel="precomputed", C=C, probability=True)
         self.X_train = None
 
     def fit(self, X, y):
@@ -119,6 +112,13 @@ class KernelSVM(BaseEstimator, ClassifierMixin):
             2. 调用 kernel_manager.compute(X, X) 计算核矩阵 K_train
             3. 使用 self.model.fit(K_train, y)
         """
+        # Create kernel_manager and model here so GridSearchCV's set_params works correctly
+        self.kernel_manager = KernelManager(
+            kernel=self.kernel, gamma=self.gamma,
+            degree=self.degree, coef0=self.coef0
+        )
+        self.model = SVC(kernel="precomputed", C=self.C, probability=True)
+        
         self.X_train = X
         K_train = self.kernel_manager.compute(X, X)
         self.model.fit(K_train, y)
@@ -164,9 +164,10 @@ class GridSearchSVM:
     def fit(self, X, y):
         # TODO: 完成 param_grid
         param_grid = {
-            'C': [0.1, 1, 10, 100],
-            'gamma': ['scale', 0.1, 0.01],
-            'kernel': ['rbf', 'poly', 'linear'],
+            'C': np.logspace(-1, 2, 10),
+            'gamma': np.logspace(-2, 0, 7),
+            # 'kernel': ['rbf', 'poly', 'linear'],
+            'kernel': ['rbf'],
         }
         from sklearn.model_selection import GridSearchCV
         self.best_model = GridSearchCV(
@@ -178,6 +179,7 @@ class GridSearchSVM:
             n_jobs=-1
         )
         self.best_model.fit(X, y)
+        self.best_params = self.best_model.best_params_
 
     def predict(self, X):
         return self.best_model.predict(X)
