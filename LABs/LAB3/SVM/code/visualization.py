@@ -120,9 +120,9 @@ def plot_grid_heatmap(grid_model, save_dir):
     params = results["params"]
     mean_test_score = results["mean_test_score"]
 
-    # 提取 C 和 gamma 维度（仅适用于 rbf/poly）
-    C_values = sorted({p["C"] for p in params})
-    gamma_values = sorted({str(p["gamma"]) for p in params})
+    # 提取 C 和 gamma 维度
+    C_values = sorted({p['C'] for p in params})
+    gamma_values = sorted({p['gamma'] for p in params})
 
     # 构建 score 矩阵
     score_matrix = np.zeros((len(C_values), len(gamma_values)))
@@ -130,11 +130,15 @@ def plot_grid_heatmap(grid_model, save_dir):
     for i, C in enumerate(C_values):
         for j, gamma in enumerate(gamma_values):
             for k, p in enumerate(params):
-                if p["C"] == C and str(p["gamma"]) == gamma:
+                if p["C"] == C and p["gamma"] == gamma:
                     score_matrix[i, j] = mean_test_score[k]
+
+    C_values = [f"{c:.1f}" for c in C_values]
+    gamma_values = [f"{g:.2f}" for g in gamma_values]
 
     plt.figure(figsize=(8, 6))
     sns.heatmap(score_matrix, annot=True, xticklabels=gamma_values, yticklabels=C_values,
+                vmin=0.8, vmax=0.9,
                 cmap="YlGnBu", fmt=".3f")
 
     plt.xlabel("Gamma")

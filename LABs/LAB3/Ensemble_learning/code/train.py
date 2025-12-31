@@ -61,6 +61,13 @@ def run_one(method, X_train, X_test, y_train, y_test, args):
             save_path=os.path.join(save_dir, "adaboost_training_curve.png")
         )
 
+    # GBDT 特殊：保存训练损失曲线
+    if method == "gbdt" and hasattr(model, "train_losses"):
+        plot_adaboost_training_curve(
+            model.train_losses,
+            save_path=os.path.join(save_dir, "gbdt_training_curve.png")
+        )
+
 def main():
     args = get_args()
     X_train, X_test, y_train, y_test = load_data()
@@ -75,4 +82,7 @@ def main():
 
 
 if __name__ == "__main__":
+    import numpy as np
+    np.random.seed(42)
+
     main()

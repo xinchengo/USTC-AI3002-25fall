@@ -1,0 +1,528 @@
+\documentclass{ctexart}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{siunitx}
+\usepackage{amsthm}
+\usepackage{booktabs}
+\usepackage{mathtools}
+\usepackage{hyperref}
+\usepackage{geometry}
+\geometry{a4paper, left=1in, right=1in, top=1in, bottom=1in}
+
+\allowdisplaybreaks
+
+\title{《人工智能与机器学习基础》第三次作业}
+\author{PB24000150 李欣宸}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{第一题}\label{ux7b2cux4e00ux9898}
+
+\subsection{(a)}\label{a}
+
+下面我们证明对于线性可分数据集，（硬间隔）SVM 的目标是：
+
+\begin{equation*}
+\min_{w,b}\frac{1}{2}\|w\|^2\quad \text{s.t.}\quad y_i(w^Tx_i+b)\ge 1
+\end{equation*}
+
+回想一下，由于 SVM
+的目标是在线性分隔数据的同时最大化最小间隔；根据几何学的知识，点 \(x\)
+到超平面 \(f_{w,b}(x) = w^T x + b = 0\) 的距离为
+\(\frac{|f_{w,b}(x)|}{\|w\|}\)；因此所有样本的最小间隔可以表示为：
+
+
+\begin{equation*}
+\begin{aligned}
+\gamma &= \min_{i}\frac{|f_{w,b}(x_i)|}{\|w\|} \\
+&= \min_i\frac{y_if_{w,b}(x_i)}{\|w\|}
+\end{aligned}
+\end{equation*}
+
+
+该等号成立是因为 SVM 中我们只考虑分类正确的样本，而标签的取值被定义为
+\(y_i \in \{+1, -1\}\)。这样，我们可以得到 SVM 的目标函数：
+
+\begin{equation*}
+\max_{w,b}\gamma = \max_{w,b}\min_i \frac{y_i f_{w,b}(x_i)}{\|w\|} = \max_{w,b}\min_i \frac{y_i (w^Tx_i+b)}{\|w\|}
+\end{equation*}
+
+为了简化这个目标函数，需要利用 \(w,b\)
+具有的一个性质------\textbf{伸缩不变性}，即，对于缩放操作
+\(w^\ast = cw,~b^\ast = bw\)，\(\lambda\) 不变，因此我们可以对 \(w,b\)
+增加正则化条件：
+
+
+\begin{gather*}
+y_i(w^Tx_i+b)\ge 1,\quad\exists i~~\text{s.t.}~\text{``}=\text{''} \\
+\implies \gamma = \frac{1}{\|w\|} \\
+\implies \arg\max_{w,b}\gamma = \arg\min_{w,b}\frac{1}{2}\|w\|^2
+\end{gather*}
+
+
+这样我们就完成了硬间隔 SVM 的目标函数 推导。
+
+\subsection{(b)}\label{b}
+
+对于软间隔 SVM 的目标函数：
+
+\begin{equation*}
+\min_{w,b,\zeta}\frac{1}{2}\|w\|^2+C\sum_{i=1}^n\zeta_i^2
+\end{equation*}
+
+由 Lagrange 乘子法：
+
+
+\begin{gather*}
+\min_{w}f(w)\\
+g_{i} \le 0,~\forall 1\le i\le k\\
+h_{i} = 0,~\forall 1\le i\le l\\
+\implies \mathcal L(w,\boldsymbol\alpha,\boldsymbol\beta) = f(w)+\sum_{i}\alpha_i g_i(w) + \sum_{j}\beta_j h_j(w)
+\end{gather*}
+
+
+代入：
+
+
+\begin{gather*}
+f(w,b,\zeta) = \frac{1}{2}\|w\|^2+C\sum_{i=1}^{N}\zeta_i^2\\
+g_i = 1 - \zeta_i - y_i(w\cdot x_i+b),\quad g_{i+N} = -\zeta_i\\
+\implies \mathcal L(w,b,\zeta,\boldsymbol \alpha,\boldsymbol \mu) = \frac{1}{2}\|w\|^2+C\sum_{i=1}^N\zeta_{i}^2-\sum_{i=1}^N\alpha_i(y_i(w\cdot x_i+b) - (1-\zeta_i))-\sum_{i=1}^N\mu_{i}\zeta_i \\
+\implies p^\ast = \min_{w,b,\zeta}f(w,b,\zeta)=\min_{w,b}\max_{\boldsymbol \alpha,\boldsymbol\mu:\alpha_i,\mu_i\ge 0}\mathcal L(w,b,\zeta,\boldsymbol \alpha,\boldsymbol \mu) \\
+d^\ast = \max_{\boldsymbol\alpha,\boldsymbol \mu:\alpha_i,\mu_i\ge 0}\min_{w,b,\zeta}\mathcal L(w,b,\zeta,\boldsymbol \alpha,\boldsymbol \mu)
+\end{gather*}
+
+
+为了写出问题的对偶形式，我们要求出满足 Karush-Kuhn-Tucker 条件的一组
+\((w,b,\boldsymbol \alpha, \boldsymbol \mu)\)，首先带入 KKT
+条件的第一个要求（驻点）：
+
+
+\begin{gather*}
+\frac{\partial \mathcal L}{\partial w} = w - \sum_{i=1}^N\alpha_iy_ix_i=0\implies w=\sum_{u=1}^N\alpha_iy_ix_i\\
+\frac{\partial \mathcal L}{\partial b} = -\sum_{i=1}^N\alpha_iy_i=0\implies \sum_{i=1}^N\alpha_iy_i = 0\\
+\frac{\partial \mathcal L}{\partial \zeta_i} = 2C\zeta_i-\alpha_i-\mu_i=0\implies \zeta_i=\frac{\alpha_i + \mu_i}{2C}
+\end{gather*}
+
+
+考虑用 KKT 条件的其他项简化该式：
+
+
+\begin{gather*}
+\mu_i\zeta_i=0,\quad \mu_i\ge 0,\quad \zeta_i\ge 0 \\
+\implies \mu_i=0\quad \implies \zeta_i = \frac{\alpha_i}{2C}
+\end{gather*}
+
+
+带入软间隔 SVM 的对偶形式 \(d^\ast\) 可以得到：
+
+
+\begin{gather*}
+\frac{1}{2}\|w\|^2=\frac{1}{2}\sum_{i=1}^N\sum_{j=1}^N\alpha_i\alpha_jy_iy_j(x_i\cdot x_j) \\
+C\sum_{i=1}^N\zeta_i^2 = \frac{1}{4C}\sum_{i=1}^N\alpha_i^2\\
+\begin{aligned}
+-\sum_{i=1}^N\alpha_i(y_i(w\cdot x_i+b) - (1-\zeta_i))&= -\sum_{i=1}^N\alpha_iy_ix_i\cdot w-b\sum_{i=1}^N\alpha_iy_i+\sum_{i=1}^N\alpha_i-\sum_{i=1}^N\alpha_i\zeta_i\\
+&=-\sum_{i=1}^N\sum_{j=1}^N\alpha_i\alpha_jy_iy_j(x_i\cdot x_j)-0+\sum_{i=1}^N\alpha_i-\frac{1}{2C}\sum_{i=1}^N\alpha^2
+\end{aligned}\\
+-\sum_{i=1}^N\mu_i\zeta_i=0\\
+\implies \min_{w,b,\zeta}\mathcal L(w,b,\zeta,\boldsymbol \alpha, \boldsymbol \mu)=\sum_{i=1}^N\alpha_i - \frac{1}{4C}\sum_{i=1}^N\alpha_i^2-\frac{1}{2}\sum_{i=1}^{N}\sum_{j=1}^{N}\alpha_i\alpha_jy_iy_j(x_i\cdot x_j)
+\end{gather*}
+
+
+整理知，软间隔 SVM 的对偶形式为：
+
+\begin{equation*}
+\begin{matrix}
+\displaystyle\max_{\boldsymbol \alpha}&\displaystyle\sum_{i=1}^N\alpha_i - \frac{1}{4C}\sum_{i=1}^N\alpha_i^2-\frac{1}{2}\sum_{i=1}^{N}\sum_{j=1}^{N}\alpha_i\alpha_jy_iy_j(x_i\cdot x_j)\\
+\text{s.t.} & \displaystyle \sum_{i=1}^N\alpha_iy_i = 0, \quad \alpha_i\ge 0
+\end{matrix}
+\end{equation*}
+
+
+\subsection{(c)}\label{c}
+
+\paragraph{(1)}\label{section}
+
+由对偶问题的定义，其显式形式为：
+
+\begin{equation*}
+\max_{\alpha}\min_{w,b}\mathcal L(w, b,\boldsymbol \alpha) = \max_{\alpha}\min_{w,b}\frac{1}{2}\|w\|^2-\sum_{i=1}^N\alpha_i(y_i(w^Tx_i+b)-1)
+\end{equation*}
+
+
+\paragraph{(2)}\label{section-1}
+
+
+\begin{gather*}
+\frac{\partial \mathcal L}{\partial w} = w-\sum_{i=1}^N\alpha_iy_ix_i=0\implies w=\sum_{u=1}^N\alpha_iy_ix_i\\
+\frac{\partial \mathcal L}{\partial b} = -\sum_{i=1}^N\alpha_iy_i=0 \\
+\implies
+\begin{aligned}
+\mathcal L(w, b, \boldsymbol \alpha)&=\frac{1}{2}\sum_{i=1}^N\alpha_i\alpha_jy_iy_j(x_i^Tx_j)-\sum_{i=1}^N\alpha_i\alpha_jy_iy_j(x_i^Tx_j)+\sum_{i=1}^N\alpha_i \\
+&= \sum_{i=1}^N\alpha_i - \frac{1}{2}\sum_{i=1}^N\sum_{j=1}^N\alpha_i\alpha_jy_iy_j(x_i^Ty_i)
+\end{aligned}
+\end{gather*}
+
+
+\paragraph{(3)}\label{section-2}
+
+将 \(X,y\) 写成矩阵形式：
+
+
+\begin{gather*}
+X = \begin{pmatrix}
+3 & 4 & 1\\
+3 & 3 & 1
+\end{pmatrix}, \quad
+y = \begin{pmatrix}
++1&+1&-1
+\end{pmatrix}^T\\
+\begin{aligned}
+\implies \mathcal L(\boldsymbol \alpha) &= \mathbf{1}^T\boldsymbol\alpha-\frac{1}{2}\boldsymbol \alpha^T(X^TX\odot yy^T)\boldsymbol \alpha \\
+&= \mathbf{1}^T\boldsymbol\alpha-\frac{1}{2}\boldsymbol \alpha^T
+\begin{pmatrix}
+18 & 21 & -6\\
+21 & 25 & -7\\
+-6 & -7 & 2
+\end{pmatrix}\boldsymbol \alpha
+\end{aligned} \\
+\boxed{
+\begin{matrix}
+\displaystyle\max_{\boldsymbol \alpha}&\displaystyle\mathbf{1}^T\boldsymbol\alpha-\frac{1}{2}\boldsymbol \alpha^TQ\boldsymbol \alpha\\
+\text{s.t.} & \boldsymbol \alpha^Ty = 0, \quad \alpha_i\ge 0
+\end{matrix}
+}
+\end{gather*}
+
+
+这是一个经典的二次规划问题，使用 Python 的 \texttt{cvxopt}
+库就可以得到优化的结果，但是我们也可以对其进行展开并手动计算，带入
+\(\alpha_3=\alpha_1+\alpha_2\)：
+
+\begin{equation*}
+\mathcal L(\alpha_1,\alpha_2)
+=
+-4\alpha_1^2
+-10\alpha_1\alpha_2
+-\frac{13}{2}\alpha_2^2
++2\alpha_1
++2\alpha_2
+\end{equation*}
+
+最大值在边界上取到：
+
+\begin{equation*}
+(\alpha_1,\alpha_2,\alpha_3) = \left(\frac{1}{4},0,\frac{1}{4}\right)
+\end{equation*}
+
+
+\paragraph{(4)}\label{section-3}
+
+
+\begin{equation*}
+\begin{aligned}
+w &= \sum_{i=1}^3\alpha_iy_ix_i=\frac{1}{4}(3,3)^T+0-\frac{1}{4}(1,1)^T \\
+&= \left(\frac{1}{2},\frac{1}{2}\right)
+\end{aligned}
+\end{equation*}
+
+
+\paragraph{(5)}\label{section-4}
+
+由于数据集中负样本只有一个，所以这个负样本必然是支持向量：
+
+
+\begin{gather*}
+y_3(w^Tx_3+b)=1 \\
+\implies b = y_3^{-1}-w^Tx_3=-1-(0.5,0.5)\cdot(1,1)=-2
+\end{gather*}
+
+
+\paragraph{(6)}\label{section-5}
+
+
+\begin{gather*}
+w^Tx+b=0\\
+\implies \frac{1}{2}x_1+\frac{1}{2}x_2-2=0\quad \text{or}\quad x_1+x_2-4=0
+\end{gather*}
+
+
+\subsection{(d)}\label{d}
+
+\begin{equation*}
+w = \sum_{i=1}^N\alpha_iy_ix_i
+\end{equation*}
+
+
+对于支持向量，\(\alpha_i > 0\)；对非支持向量，\(\alpha_i = 0\)；显然只有支持向量对最终的法向量
+\(w\) 有贡献；而偏置 \(b\)
+的计算使用的也是支持向量，也只与支持向量有关。
+
+\section{第二题}\label{ux7b2cux4e8cux9898}
+
+\subsection{(a)}\label{a-1}
+
+\paragraph{(1)}\label{section-6}
+
+\begin{itemize}
+
+\item
+  若按收入水平分类，所有样本都分类正确，错误率为 \(0\)；
+\item
+  若按是否有房分类，\(5\) 个样本中 \(2\) 号分类错误，错误率为 \(20\%\)；
+\item
+  因此，最优分类特征为``收入水平''
+\end{itemize}
+
+\paragraph{(2)}\label{section-7}
+
+
+\begin{equation}
+I_{\text{err}}(R)=1-\max_{k}p_k \label{eq:err}
+\end{equation}
+
+
+\begin{itemize}
+
+\item
+  因为``分类错误率''低可能代表模型不仅拟合了数据的分布，还拟合了数据中的噪声；``分类错误率''函数
+  \eqref{eq:err} 中只考虑了``元素最多''的类别，对噪声不敏感；
+\item
+  ``提前停止''时模型还来不及拟合噪声就停止训练；``剪枝''通过设计树复杂度的度量，降低树的复杂度以避免拟合噪声；
+\end{itemize}
+
+\paragraph{(3)}\label{section-8}
+
+\begin{itemize}
+
+\item
+  在所有相邻样本的中点中，使划分后错误率（或者其他不纯度指标）最低的值作为阈值；
+\item
+  因为对一对相邻样本之间的任何取值，它们把样本都划分为相同的两部分，其``错误率''\,``基尼不纯度''等特征都相等，所以只需要选取比较有代表性的``中点''；
+\item
+  可以；
+\end{itemize}
+
+\paragraph{(4)}\label{section-9}
+
+
+\begin{gather*}
+H(D) = -0.6\log0.6-0.4\log0.4=0.6730\\
+H(D\mid A) = \sum_{i=1}^m\frac{|D_i|}{|D|}H(D_i)\\
+\begin{matrix}
+\text{By income:} &
+\begin{matrix}
+H(D\mid A)=0+0+0=0\\
+\implies \quad \operatorname{Gain}(D,A)=0.6730-0=0.6730
+\end{matrix}\\
+\text{By homeownership:} &
+\begin{matrix}
+H(D\mid A)=0+0.3\times(-\frac{1}{3}\log\frac{1}{3}-\frac{2}{3}\log\frac{2}{3})=0.1910 \\
+\implies \quad \operatorname{Gain}(D,A)=0.6730-0.1910=0.4821
+\end{matrix}
+\end{matrix}
+\end{gather*}
+
+
+因此我们选择以收入作为分类标准，这与分类错误率的选择结果一致。（在此处使用自然对数）
+
+\paragraph{(5)}\label{section-10}
+
+\begin{equation*}
+\operatorname{IV}(A)=-\sum_{i=1}^mp_i\log p_i,\quad\text{where}~p_i=\frac{|D_i|}{|D|}
+\end{equation*}
+
+\begin{itemize}
+
+\item
+  信息增益的含义是：增加该分裂过后，对类别进行编码的期望位数的减少量------即，这个分裂``相当于''多少个自然单位（natural
+  unit,
+  nat）；而一个``取值数多''的特征更可能提供较多的位数，自然更可能有较高的信息增益。
+\item
+  增益率将信息增益除以一个``固有值''，固有值指分裂本身提供的编码位数；``固有值''衡量的就是这个分裂本身的``复杂度''，``增益率''是除过``复杂度''进行调整的信息增益。
+\end{itemize}
+
+\subsection{(b)}\label{b-1}
+
+\paragraph{(1)}\label{section-11}
+
+因为决策树训练到足够深的时候可以完美拟合所有的数据，而数据本身是具有噪声的，所以决策树训练足够深一定会发生过拟合。
+
+\paragraph{(2)}\label{section-12}
+
+\begin{itemize}
+
+\item
+  \textbf{主要区别}：``预剪枝''在生成决策树的过程中判断是否继续分裂，``后剪枝''在计算完过拟合的决策树后再判断把那些子树替换为叶结点后``损失''最小；``预剪枝''计算简单，但不精准（比如异或问题很难判断是否应当停止）；``后剪枝''计算复杂度相对较高，但是更为准确；
+\item
+  \textbf{使用场景}：``后剪枝''适用于数据集较小，对时间要求较低的场景，``预剪枝''相反。
+\end{itemize}
+
+\paragraph{(3)}\label{section-13}
+
+\begin{itemize}
+
+\item
+  应当更多地采取``后剪枝''，减少``预剪枝''；
+\item
+  ``预剪枝''时应提高停止分裂时准确率（或某种不纯度）提升的阈值，``后剪枝''应提高保留子树（而不是将其替换为叶结点）对不纯度收益的要求。
+\end{itemize}
+
+\section{第三题}\label{ux7b2cux4e09ux9898}
+
+\subsection{(a)}\label{a-2}
+
+\paragraph{(1)}\label{section-14}
+
+\begin{itemize}
+
+\item
+  \textbf{样本采样方式}：Boosting
+  的采样方式是带权完整采样，每个模型的表现会影响下一个模型训练时数据的权重；而
+  Bagging 的采样方式是自助采样（bootstrap sampling）;
+\item
+  \textbf{模型训练目标}：Bagging
+  的目标是降低方差------通过``平均化''多个不稳定模型使最终模型相对稳定；Boosting
+  的目标是降低偏差，通过让后面的模型不断``纠正''前面模型的错误来增进对数据集的拟合。
+\end{itemize}
+
+\paragraph{(2)}\label{section-15}
+
+假定我们已知训练样本权重的更新公式：
+
+
+\begin{gather*}
+w_{i,1} = \frac{1}{N}\\
+w_{i,t+1} = w_{i,t} \exp\left(-y_i\alpha_tf_t(x_i)\right)
+\end{gather*}
+
+
+AdaBoost 最终的分类器是：
+
+\begin{equation*}
+F(x)=\operatorname{sgn}(\operatorname{score}(x)),\quad \operatorname{score}(x) = \sum_{t=1}^T\alpha_tf_t(x)
+\end{equation*}
+
+我们要最小化训练误差，这是一个 0-1
+损失，我们可以使用指数损失对其进行放缩，并用 AdaBoost 的性质进行化简：
+
+
+\begin{equation*}
+\begin{aligned}
+\frac{1}{N}\sum_{i=1}^N\mathbb 1[F(x_i)\ne y_i] &\le \frac{1}{N}\sum_{i=1}^N\exp(-y_i\operatorname{score}(x_i)) \\
+&=\frac{1}{N}\sum_{i=1}^N\exp\left(-y_i\sum_{t=1}^T\alpha_tf_t(x_i)\right) \\
+&= \frac1N\sum_{i=1}^N\prod_{t=1}^T\exp\left(-y_i\alpha_tf_t(x_i)\right) \\
+&= \sum_{i=1}^Nw_{i,1}\prod_{t=1}^T\exp\left(-y_i\alpha_tf_t(x_i)\right)\\
+&= \prod_{t=1}^T\sum_{i=1}^Nw_{i,t}\exp\left(-y_i\alpha_tf_t(x_i)\right)\\
+&\triangleq \prod_{t=1}^TZ_t
+\end{aligned}
+\end{equation*}
+
+
+倒数第三个等式成立是因为我们初始化
+\(w_{i,1}=\frac{1}{N}\)，倒数第二个等式成立来自样本权重的更新公式。
+
+由上面的不等式可知，控制 \(\prod_{t=1}^TZ_t\)
+的方式相当于控制指数损失，从而控制训练误差，使用贪心的策略，每次优先选择最小的
+\(Z_t\)。
+
+设训练样本的权重分布为 \(D_t\)，定义加权错误率 \(\epsilon_t\)：
+
+
+\begin{equation*}
+\begin{aligned}
+\epsilon_t&\triangleq P_{x,y\sim D_t}(f_t(x)\ne y)\\
+&=\sum_{i=1}^nw_{i,t}\mathbb 1[f_t(x_i)\ne y_i]
+\end{aligned}
+\end{equation*}
+
+
+我们可以用 \(\epsilon_t\) 来表示 \(Z_t\)，通过最小化 \(Z_t\) 得到
+\(\alpha_t\) 的取值：
+
+
+\begin{gather*}
+\begin{aligned}
+Z_t &= \sum_{i=1}^nw_{i,t}\exp\left(-y_i\alpha_tf_t(x_i)\right)\\
+&= \mathbb E_{x,y\sim D_t}\left[\exp(-y_t\alpha_t f_t(x))\right] \\
+&=\mathbb E_{x,y\sim D_t}\left[\exp(-y_t\alpha_t f_t(x))\mid f_t(x)=y\right]P_{x,y\sim D_t}(f_t(x)=y)\\
+&\quad+\mathbb E_{x,y\sim D_t}\left[\exp(-y_t\alpha_t f_t(x))\mid f_t(x)\ne y\right]P_{x,y\sim D_t}(f_t(x)\ne y)\\
+&= e^{-\alpha_t}(1-\epsilon_t)+e^{\alpha_t}\epsilon_t\\
+&\ge 2\sqrt{\epsilon_t(1-\epsilon_t)}
+\end{aligned}\\
+\frac{\partial L}{\partial \alpha_t} = -e^{-\alpha_t}(1-\epsilon_t)+e^{\alpha_t}=0\\
+\implies \alpha_t =\frac{1}{2}\ln\frac{1-\epsilon_t}{\epsilon_t}
+\end{gather*}
+
+
+\subsection{(b)}\label{b-2}
+
+\paragraph{(1)}\label{section-16}
+
+我们只考虑二分类问题的情况，记分类错误的个数为
+\(X,~X\sim B(100, 0.2)\)，整体模型错误率为
+\(P(X\ge 50)\)（我们认为无法精确计算是一种错误）。
+
+由 de Moivre--Laplace
+中心极限定理，\(n=100>30\)，用正态分布近似可以较好地满足估计的要求：
+
+
+\begin{equation*}
+\begin{aligned}
+P(X\ge 50)&=P\left(\frac{X-20}{\sqrt{20\times0.8}}\ge\frac{50-20}{\sqrt{20\times 0.8}}\right)\\
+&\approx1-\operatorname{\Phi}\left(\frac{15}{2}\right)=3.19\times 10^{-14}
+\end{aligned}
+\end{equation*}
+
+
+因此，整体模型错误率的期望值约为 \(10^{-14}\) 量级。
+
+\paragraph{(2)}\label{section-17}
+
+
+\begin{gather*}
+\mathbb E[(Y-\hat f(x))^2] = \sigma^2+ \underbrace{\mathbb E^2[\bar f(x)-f(x)]}_{\operatorname{Bias}(\hat f(x))} + \operatorname{Var}(\hat f(x)) \\
+\mathbb E\left[\left(Y - \frac{1}{T}\sum_{t=1}^T\hat f_t(x)\right)^2\right] = \sigma^2+\operatorname{Bias}(\hat f(x))+\frac{1}{T^2}\sum_{i=1}^T\sum_{j=1}^T\operatorname{Cov}(\hat f_i(x), f_j(x))
+\end{gather*}
+
+
+\begin{itemize}
+
+\item
+  若树与树之间相互独立，\(\forall i\ne j,~\operatorname{Cov}(\hat f_i(x),\hat f_j(x))=0\)，右侧偏差不变，方差变为原来的
+  \(\frac{1}{T}\)；
+\item
+  若树与树之间有正相关，右侧偏差不变，方差在原来方差的 \(\frac{1}{T}\)
+  倍和 \(1\) 倍之间，且相关性越大，方差越大；
+\item
+  综上说明，相关性增大，总体性能下降直至与单棵树的性能相同；
+\end{itemize}
+
+\subsection{(c)}\label{c-1}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+
+\item
+  \textbf{错误}：``单一性''应为``多样性''，由 (b)
+  的结论，模型之间的相关性应越小越好；集成学习中，常使用不同模型或者同一模型的不同参数设置，以减少模型间的相关性；
+\item
+  \textbf{正确}：在 boosting
+  中，训练后续模型时，之前训练的模型参数不会随之更新，只有占比会；在
+  bagging 中，每个模型的采样、训练彼此独立；
+\item
+  \textbf{错误}：AdaBoost
+  每次训练完一个学习器，会调整数据的权值，但是并不一定进行采样（sampling）；AdaBoost
+  也可以每次都在全数据集下进行，采样并不是必需的；
+\item
+  \textbf{正确}：随机森林算法随着树的增多并不会显著增加整个模型的复杂性，即，只能减小方差但不能减小偏差；而
+  boosting 算法随着 \(T\)
+  的增大，模型可以变得无限复杂，既可以减小方差，也可以减小偏差（在过拟合前）；此外，boosting
+  算法每次聚焦之前模型分类错误的数据点，可以使训练过程变得更加高效。
+\end{enumerate}
+
+\end{document}

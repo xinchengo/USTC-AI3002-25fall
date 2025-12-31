@@ -44,7 +44,7 @@ def plot_adaboost_training_curve(errors, save_path=None):
 # -------------------------------------------------------
 def plot_confusion(y_true, y_pred, title="Confusion Matrix", save_path=None):
     cm = confusion_matrix(y_true, y_pred)
-    plt.figure(figsize=(5,4))
+    plt.figure(figsize=(3,3))
     sns.heatmap(cm, annot=True, fmt="d", cmap="Blues")
     plt.title(title)
     plt.xlabel("Predicted")
