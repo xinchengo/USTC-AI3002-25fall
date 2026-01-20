@@ -101,13 +101,25 @@ def q_learning(env, num_episodes, discount_factor=1.0, alpha=0.5, epsilon=0.1, m
         # One step in the environment (with max_steps safety limit)
         for t in range(max_steps):
             #########################Implement your code here#########################
-            raise NotImplementedError("Not implemented")
             # step 1 : Take a step
+            action_probs = policy(state)
+            action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
+            next_state, reward, done, info = env.step(action)
 
             # step 2 : TD Update (with terminal handling)
+            if done:
+                target = reward
+            else:
+                best_next_action = np.argmax(Q[next_state])
+                target = reward + discount_factor * Q[next_state][best_next_action]
+            Q[state][action] += alpha * (target - Q[state][action])
 
             # step 3 : Move to next state and handle episode end
-
+            stats.episode_rewards[i_episode] += reward
+            stats.episode_lengths[i_episode] = t
+            if done:
+                break
+            state = next_state
             #########################Implement your code end#########################
     return Q, stats
 
@@ -131,12 +143,35 @@ def double_q_learning(env, num_episodes, discount_factor=1.0, alpha=0.5, epsilon
 
         for t in range(max_steps):
             #########################Implement your code here#########################       
-            raise NotImplementedError("Not implemented")
             # step 1 : Take a step using combined Q1+Q2 policy
+            action_probs = policy(state)
+            action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
+            next_state, reward, done, info = env.step(action)
 
             # step 2 : Double Q-learning update
+            # With probability 0.5, update Q1 using best action from Q2
+            # Otherwise, update Q2 using best action from Q1
+            if np.random.rand() < 0.5:
+                best_next_action = np.argmax(Q1[next_state])
+                if done:
+                    target = reward
+                else:
+                    target = reward + discount_factor * Q2[next_state][best_next_action]
+                Q1[state][action] += alpha * (target - Q1[state][action])
+            else:
+                best_next_action = np.argmax(Q2[next_state])
+                if done:
+                    target = reward
+                else:
+                    target = reward + discount_factor * Q1[next_state][best_next_action]
+                Q2[state][action] += alpha * (target - Q2[state][action])
 
             # step 3 : Move to next state and handle episode end
+            stats.episode_rewards[i_episode] += reward
+            stats.episode_lengths[i_episode] = t
+            if done:
+                break
+            state = next_state
             #########################Implement your code end#########################
                 
     return Q1, Q2, stats
