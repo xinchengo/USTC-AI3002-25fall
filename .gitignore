@@ -225,3 +225,4 @@ saves/
 /LABs/Final-Project/gobang/checkpoints_baseline/
 /LABs/Final-Project/gobang/checkpoints_deep/
 /LABs/Final-Project/gobang/loss_tracker.png
+/LABs/Final-Project/gobang/wandb/

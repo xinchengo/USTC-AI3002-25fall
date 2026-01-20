@@ -95,10 +95,14 @@ class Actor(nn.Module):
         self.optimizer = torch.optim.Adam(params=self.parameters(), lr=lr)
 
     def forward(self, x: np.ndarray):
-        if len(x.shape) == 2:
-            output = torch.tensor(x).to(device).to(torch.float32).unsqueeze(0).unsqueeze(0)
+        if isinstance(x, torch.Tensor):
+            output = x.detach().clone().to(device).to(torch.float32)
+            if len(output.shape) == 2:
+                output = output.unsqueeze(0).unsqueeze(0)
+        elif len(x.shape) == 2:
+            output = torch.from_numpy(x).to(device).to(torch.float32).unsqueeze(0).unsqueeze(0)
         else:
-            output = torch.tensor(x).to(device).to(torch.float32)
+            output = torch.from_numpy(x).to(device).to(torch.float32)
 
         # Further process and transform the data here. Ensure that the output is shaped (B, n ** 2).
         # We have already ensured that the shape of the raw input is unified to be (B, 1, N, N),
@@ -211,10 +215,14 @@ class Critic(nn.Module):
 
     def forward(self, x: np.ndarray, action: np.ndarray):
         indices = torch.tensor([_position_to_index(self.board_size, x, y) for x, y in action]).to(device)
-        if len(x.shape) == 2:
-            output = torch.tensor(x).to(device).to(torch.float32).unsqueeze(0).unsqueeze(0)
+        if isinstance(x, torch.Tensor):
+            output = x.detach().clone().to(device).to(torch.float32)
+            if len(output.shape) == 2:
+                output = output.unsqueeze(0).unsqueeze(0)
+        elif len(x.shape) == 2:
+            output = torch.from_numpy(x).to(device).to(torch.float32).unsqueeze(0).unsqueeze(0)
         else:
-            output = torch.tensor(x).to(device).to(torch.float32)
+            output = torch.from_numpy(x).to(device).to(torch.float32)
 
         # BEGIN YOUR CODE
         # 前向传播

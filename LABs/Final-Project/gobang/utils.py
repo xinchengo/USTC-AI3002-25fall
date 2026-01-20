@@ -320,15 +320,15 @@ def train_model(model, num_episodes=1000, checkpoint=1000, gamma=0.5, save_dir="
             if stop:
                 break
 
-        states = torch.tensor(states).to(torch.float32).to(device)
-        rewards = torch.tensor(rewards).to(torch.float32).to(device)
-        actions = torch.tensor(actions).to(torch.float32).to(device)
+        states = torch.tensor(np.array(states)).to(torch.float32).to(device)
+        rewards = torch.tensor(np.array(rewards)).to(torch.float32).to(device)
+        actions = torch.tensor(np.array(actions)).to(torch.float32).to(device)
 
         policy, qs = model(states, actions)
         next_qs = qs[1:]
         next_qs = torch.cat((next_qs, torch.tensor([0]).to(device)))
 
-        entropy = -float(torch.mean(torch.sum(policy * torch.log(policy + 1e-6), dim=1)))
+        entropy = -float(torch.mean(torch.sum(policy * torch.log(policy + 1e-6), dim=1)).detach())
         entropy_records.append(entropy)
 
         actor_loss, critic_loss = model.optimize(policy, qs, actions, rewards, next_qs, gamma)
