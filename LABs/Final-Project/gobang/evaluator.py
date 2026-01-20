@@ -2,7 +2,14 @@ from utils import *
 from model_loader import get_model
 from opponent_loader import get_opponent
 
+import argparse
+
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model_path', type=str, default='model.pth', help='Path to the trained model for black pieces.')
+    parser.add_argument('--opponent_path', type=str, default='opponent.pth', help='Path to the opponent model for white pieces.')
+    args = parser.parse_args()
+    
     # Define gaming settings.
     board_size = 12
     bound = 5

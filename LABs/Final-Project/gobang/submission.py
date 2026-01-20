@@ -6,18 +6,6 @@ from typing import *
 import sys
 import argparse
 
-parser = argparse.ArgumentParser(description='args')
-parser.add_argument('--num_episodes', type=int, help='number of episodes')
-parser.add_argument('--checkpoint', type=int, help='the interval of saving models')
-parser.add_argument('--use_wandb', action='store_true', help='use wandb for experiment tracking (requires wandb installed)')
-parser.add_argument('--wandb_project', type=str, default='gobang-rl-AI3002', help='wandb project name')
-parser.add_argument('--wandb_name', type=str, default=None, help='wandb run name')
-parser.add_argument('--use_deep', action='store_true', help='use deep cnn architecture') # 新增定义 use_deep
-
-args = parser.parse_args()
-num_episodes = args.num_episodes
-checkpoint = args.checkpoint
-
 
 class Actor(nn.Module):
     """
@@ -311,6 +299,15 @@ class GobangModel(nn.Module):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='args')
+    parser.add_argument('--num_episodes', type=int, help='number of episodes')
+    parser.add_argument('--checkpoint', type=int, help='the interval of saving models')
+    parser.add_argument('--use_wandb', action='store_true', help='use wandb for experiment tracking (requires wandb installed)')
+    parser.add_argument('--wandb_project', type=str, default='gobang-rl-AI3002', help='wandb project name')
+    parser.add_argument('--wandb_name', type=str, default=None, help='wandb run name')
+    parser.add_argument('--use_deep', action='store_true', help='use deep cnn architecture') # 新增定义 use_deep
+    args = parser.parse_args()
+
     # 确保 num_episodes 和 checkpoint 有值
     num_episodes = args.num_episodes if args.num_episodes is not None else 1000
     checkpoint = args.checkpoint if args.checkpoint is not None else 500
