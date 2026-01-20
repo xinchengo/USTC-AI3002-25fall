@@ -12,6 +12,8 @@ parser.add_argument('--checkpoint', type=int, help='the interval of saving model
 parser.add_argument('--use_wandb', action='store_true', help='use wandb for experiment tracking (requires wandb installed)')
 parser.add_argument('--wandb_project', type=str, default='gobang-rl-AI3002', help='wandb project name')
 parser.add_argument('--wandb_name', type=str, default=None, help='wandb run name')
+parser.add_argument('--use_deep', action='store_true', help='use deep cnn architecture') # 新增定义 use_deep
+
 args = parser.parse_args()
 num_episodes = args.num_episodes
 checkpoint = args.checkpoint
@@ -24,9 +26,10 @@ class Actor(nn.Module):
     as the generated policy.
     """
 
-    def __init__(self, board_size: int, lr=1e-4):
+    def __init__(self, board_size: int, lr=1e-4, use_deep=False):
         super().__init__()
         self.board_size = board_size
+        self.use_deep = use_deep  # 标记是否使用深层网络
         """
         # Define your NN structures here. Torch modules have to be registered during the initialization process.
         # For example, you can define CNN structures as follows:
@@ -61,7 +64,30 @@ class Actor(nn.Module):
         """
 
         # BEGIN YOUR CODE
-        raise NotImplementedError("Not Implemented!")
+        if not self.use_deep:
+            # Architecture 1: Baseline CNN (3-Layer)
+            self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
+            self.relu1 = nn.ReLU()
+            self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+            self.relu2 = nn.ReLU()
+            self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+            self.relu3 = nn.ReLU()
+            flat_features = 128 * board_size * board_size
+        else:
+            # Architecture 2: Deep CNN (5-Layer)
+            self.conv1 = nn.Conv2d(1, 64, kernel_size=3, padding=1)
+            self.relu1 = nn.ReLU()
+            self.conv2 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+            self.relu2 = nn.ReLU()
+            self.conv3 = nn.Conv2d(128, 128, kernel_size=3, padding=1)
+            self.relu3 = nn.ReLU()
+            self.conv4 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
+            self.relu4 = nn.ReLU()
+            self.conv5 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
+            self.relu5 = nn.ReLU()
+            flat_features = 256 * board_size * board_size
+        
+        self.fc = nn.Linear(flat_features, board_size * board_size)
         # END YOUR CODE
 
         # Define your optimizer here, which is responsible for calculating the gradients and performing optimizations.
@@ -97,7 +123,44 @@ class Actor(nn.Module):
         # ****************************************
 
         # BEGIN YOUR CODE
-        raise NotImplementedError("Not Implemented!")
+        if isinstance(x, np.ndarray):
+            x = torch.tensor(x).to(device).float()
+        else:
+            x = x.to(device).float()
+        if x.dim() == 2: output = x.unsqueeze(0).unsqueeze(0)
+        elif x.dim() == 3: output = x.unsqueeze(0)
+        else: output = x
+        
+        # 1. 网络前向传播：通过卷积层提取特征
+        if not self.use_deep:
+            out = self.relu1(self.conv1(output))
+            out = self.relu2(self.conv2(out))
+            out = self.relu3(self.conv3(out))
+        else:
+            out = self.relu1(self.conv1(output))
+            out = self.relu2(self.conv2(out))
+            out = self.relu3(self.conv3(out))
+            out = self.relu4(self.conv4(out))
+            out = self.relu5(self.conv5(out))
+        
+        # 2. 展平张量：从 (B, Channels, N, N) 变为 (B, Channels*N*N)
+        out = out.view(out.size(0), -1)
+        
+        # 3. 全连接层：得到每个位置的原始评分
+        # 形状变为 (B, N^2)
+        logits = self.fc(out)
+
+        # 4. 合法动作掩码
+        # 输入 output 是 (B, 1, N, N)，展平对应 logits 的 (B, N^2)
+        flat_board = output.view(output.size(0), -1)
+        
+        # 创建掩码
+        illegal_mask = (flat_board != 0)
+        # 注：使用 logits[mask] = -inf 会破坏梯度计算
+        logits = logits.masked_fill(illegal_mask, -1e9)
+
+        # 5. 归一化
+        output = torch.softmax(logits, dim=1)
         # END YOUR CODE
         return output
 
@@ -130,7 +193,16 @@ class Critic(nn.Module):
         # process.
 
         # BEGIN YOUR CODE
-        raise NotImplementedError("Not Implemented!")
+        # 神经网络结构
+        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
+        self.relu1 = nn.ReLU()
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        self.relu2 = nn.ReLU()
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.relu3 = nn.ReLU()
+        
+        # 为棋盘上的每个位置生成一个Q值
+        self.fc = nn.Linear(128 * board_size * board_size, board_size * board_size)
         # END YOUR CODE
 
         # Define your optimizer here, which is responsible for calculating the gradients and performing optimizations.
@@ -145,7 +217,20 @@ class Critic(nn.Module):
             output = torch.tensor(x).to(device).to(torch.float32)
 
         # BEGIN YOUR CODE
-        raise NotImplementedError("Not Implemented!")
+        # 前向传播
+        out = self.relu1(self.conv1(output))
+        out = self.relu2(self.conv2(out))
+        out = self.relu3(self.conv3(out))
+        
+        out = out.view(out.size(0), -1)
+        
+        # B，N^2
+        q_values_all = self.fc(out)
+        
+        # 提取指定动作的 Q 值
+        output = q_values_all.gather(1, indices.unsqueeze(1))
+        # 必须 squeeze 掉最后一维，否则会导致 utils.py 中的维度不匹配错误
+        output = output.squeeze(1)
         # END YOUR CODE
 
         return output
@@ -157,8 +242,8 @@ class GobangModel(nn.Module):
     and action tensors "action", it directly outputs self.actor(x) and self.critic(x, action) as the policy and Q-values
     respectively.
     """
-
-    def __init__(self, board_size: int, bound: int):
+    # 增加 use_deep 参数
+    def __init__(self, board_size: int, bound: int, use_deep=False):
         super().__init__()
         self.bound = bound
         self.board_size = board_size
@@ -172,7 +257,9 @@ class GobangModel(nn.Module):
         # BEGIN YOUR CODE
         # self.actor = Actor(board_size=board_size, ...)
         # self.critic = Critic(board_size=board_size, ...)
-        raise NotImplementedError("Not Implemented!")
+        # Register Actor and Critic
+        self.actor = Actor(board_size=board_size, use_deep=use_deep)
+        self.critic = Critic(board_size=board_size)
         # END YOUR CODE
 
         self.to(device)
@@ -193,7 +280,10 @@ class GobangModel(nn.Module):
         Identify and debug all errors.
         """
 
-        targets = rewards + gamma * next_qs
+        # Bug 1：分离 next_qs
+        # next_qs 代表目标值。它不应该跟踪梯度。
+        targets = rewards + gamma * next_qs.detach()
+        
         critic_loss = nn.MSELoss()(targets, qs)
         indices = torch.tensor([_position_to_index(self.board_size, x, y) for x, y in actions]).to(device)
         aimed_policy = policy[torch.arange(len(indices)), indices]
@@ -201,13 +291,22 @@ class GobangModel(nn.Module):
 
         self.actor.optimizer.zero_grad()
         actor_loss.backward()
-
+        # Bug 2: Actor Optimizer Step
+        self.actor.optimizer.step()
+        
         self.critic.optimizer.zero_grad()
         critic_loss.backward()
+        # Bug 3: Critic Optimizer Step
+        self.critic.optimizer.step()
+        
         return actor_loss, critic_loss
 
 
 if __name__ == "__main__":
+    # 确保 num_episodes 和 checkpoint 有值
+    num_episodes = args.num_episodes if args.num_episodes is not None else 1000
+    checkpoint = args.checkpoint if args.checkpoint is not None else 500
+    
     if args.use_wandb:
         try:
             import wandb
@@ -225,9 +324,21 @@ if __name__ == "__main__":
         except ImportError:
             print("Warning: wandb not installed. Install with 'pip install wandb' to enable experiment tracking.")
             print("Continuing without wandb...")
+    else:
+        # 即使不开启 wandb，也初始化一个 disabled 的 wandb，防止 utils.py 报错
+        try:
+            import wandb
+            wandb.init(mode="disabled")
+        except ImportError:
+            pass
+        
+    agent = GobangModel(board_size=12, bound=5, use_deep=args.use_deep).to(device)
+    print(f"Model initialized. Use Deep CNN: {args.use_deep}")
     
-    agent = GobangModel(board_size=12, bound=5).to(device)
-    train_model(agent, num_episodes=num_episodes, checkpoint=checkpoint)
+    # 根据是否使用 deep 决定保存路径
+    save_folder = "checkpoints_deep" if args.use_deep else "checkpoints_baseline"
+    # 传递 save_dir 给 train_model
+    train_model(agent, num_episodes=num_episodes, checkpoint=checkpoint, save_dir=save_folder)
     
     if args.use_wandb:
         try:

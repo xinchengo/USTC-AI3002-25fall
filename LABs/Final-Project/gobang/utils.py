@@ -16,12 +16,13 @@ except ImportError:
     WANDB_AVAILABLE = False
     print("Warning: wandb not installed. Install with 'pip install wandb' to enable experiment tracking.")
 
-if torch.backends.mps.is_available():
-    device = torch.device("mps")
-elif torch.cuda.is_available():
-    device = torch.device("cuda")
-else:
-    device = torch.device("cpu")
+# if torch.backends.mps.is_available():
+#     device = torch.device("mps")
+# elif torch.cuda.is_available():
+#     device = torch.device("cuda")
+# else:
+#     device = torch.device("cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Current device is {device}.")
 
 
@@ -291,7 +292,7 @@ def _get_next_state(state, action, response):
     return next_state
 
 
-def train_model(model, num_episodes=1000, checkpoint=1000, gamma=0.5):
+def train_model(model, num_episodes=1000, checkpoint=1000, gamma=0.5, save_dir="checkpoints"): #用于保存 Deep 模型
     chess_board = Gobang(board_size=model.board_size, bound=model.bound, training=True)
     actor_records, critic_records, entropy_records = [], [], []
     for _ in range(num_episodes):
@@ -352,8 +353,9 @@ def train_model(model, num_episodes=1000, checkpoint=1000, gamma=0.5):
             except Exception as e:
                 print(e)
         if (_ + 1) % checkpoint == 0:
-            os.makedirs("checkpoints", exist_ok=True)
-            torch.save(model.state_dict(), f"checkpoints/model_{_}.pth")
+            # 使用传入的 save_dir
+            os.makedirs(save_dir, exist_ok=True)
+            torch.save(model.state_dict(), f"{save_dir}/model_{_}.pth")
 
 
 __all__ = ['_position_to_index', '_index_to_position', '_sample_response', 'train_model',

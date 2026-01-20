@@ -222,3 +222,6 @@ saves/
 /LABs/LAB3/assets/*_cm.png
 /LABs/LAB3/Ensemble_learning/results/
 /LABs/Final-Project/warmup/figures/
+/LABs/Final-Project/gobang/checkpoints_baseline/
+/LABs/Final-Project/gobang/checkpoints_deep/
+/LABs/Final-Project/gobang/loss_tracker.png
