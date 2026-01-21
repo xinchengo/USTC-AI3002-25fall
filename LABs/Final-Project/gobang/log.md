@@ -16,7 +16,7 @@ Plan for the gobang Actor-Critic Reinforcement Learning task
 
 For non-deep and deep version of the CNN:
 
-1. Train two models, each for 1000 epochs
+1. Train two models, each for 1000 epochs, checkpoint interval set to 200 (Each model only train once)
 2. Let the 1000 epochs version play with the 800 epoch version,
     In half of the time, the 1000 epochs version hold black,
     in the other half, the 1000 epochs version hold white.
@@ -31,29 +31,29 @@ Fill in the lines below:
 Executed script:
 ```bash
 # after `source .venv/bin/activate`
-python submission.py <FILL IN THE BLANKS>
-python submission.py <FILL IN THE BLANKS>
-<IF NECESSARY, FILL SOMETHING>
-python -m tests.evaluate <FILL IN THE BLANKS>
+python submission.py --num_episodes 1000 --checkpoint 200 --use_wandb
+python submission.py --num_episodes 1000 --checkpoint 200 --use_deep --use_wandb
+python -m tests.evaluator --player1_path checkpoints/gobang_model_20260121-102359/model_999.pth --player1_type checkpoint --player2_path checkpoints/gobang_model_20260121-102359/model_799.pth --player2_type checkpoint --episodes 500
+python -m tests.evaluator --player1_path checkpoints/deep_gobang_model_20260121-102607/model_999.pth --player1_type checkpoint --player2_path checkpoints/deep_gobang_model_20260121-102607/model_799.pth --player2_type checkpoint --episodes 500
 ```
 
 Results for the regular CNN:
 
 $$
-H_0:p=0.5\leftrightarrow H_1:p\ne 0.5\\
 \begin{gather}
-X=\sum_{i=1}^{500} X_i = \text{TO BE FILLED IN}\\
-p=\text{THE TO-BE-FILLED-IN p-value}
+H_0:p=0.5\leftrightarrow H_1:p\ne 0.5\\
+X=\sum_{i=1}^{500} X_i = 245\\
+p=0.655>0.01
 \end{gather}
 $$
 
 Results for the deep CNN:
 
 $$
-H_0:p=0.5\leftrightarrow H_1:p\ne 0.5\\
 \begin{gather}
-X=\sum_{i=1}^{500} X_i = \text{TO BE FILLED IN}\\
-p=\text{THE TO-BE-FILLED-IN p-value}
+H_0:p=0.5\leftrightarrow H_1:p\ne 0.5\\
+X=\sum_{i=1}^{500} X_i = 254\\
+p=0.720>0.01
 \end{gather}
 $$
 
@@ -71,11 +71,12 @@ Fill in the lines below:
 Executed script:
 
 ```bash
-TO BE FILLED IN
+python -m tests.evaluator --player1_path checkpoints/gobang_model_20260121-102359/model_999.pth --player1_type checkpoint --player2_path checkpoints/deep_gobang_model_20260121-102607/model_999.pth --player2_type checkpoint --episodes 100
 ```
 
 Results
 
-$$
-TO BE FILLED IN
-$$
+
+- Regular CNN wins: 6 (6\%)
+- Deep CNN wins: 94 (94\%)
+- The deep CNN significantly outperforms the regular CNN.
