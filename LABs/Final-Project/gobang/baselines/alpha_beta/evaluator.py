@@ -36,6 +36,19 @@ class BoardEvaluator:
         # Directions: horizontal, vertical, diagonal /, diagonal \
         self.directions = [(0, 1), (1, 0), (1, 1), (1, -1)]
     
+    @staticmethod
+    def get_opponent(player: int) -> int:
+        """
+        Get the opponent player number.
+        
+        Args:
+            player: Current player (1 or 2)
+            
+        Returns:
+            Opponent player number (2 or 1)
+        """
+        return 3 - player
+    
     def evaluate(self, board: np.ndarray, player: int) -> int:
         """
         Evaluate the board from the perspective of the given player.
@@ -47,7 +60,7 @@ class BoardEvaluator:
         Returns:
             Score for the player (positive is good for player)
         """
-        opponent = 3 - player  # If player is 1, opponent is 2, and vice versa
+        opponent = self.get_opponent(player)
         
         # Calculate scores for both players
         player_score = self._calculate_player_score(board, player)
@@ -96,7 +109,7 @@ class BoardEvaluator:
             Score for this line
         """
         dr, dc = direction
-        opponent = 3 - player
+        opponent = self.get_opponent(player)
         
         # Count consecutive pieces in the forward direction
         count = 1

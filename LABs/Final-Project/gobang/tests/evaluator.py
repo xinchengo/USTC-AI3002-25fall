@@ -151,6 +151,8 @@ def main():
                        help='Size of the board (default: 12)')
     parser.add_argument('--bound', type=int, default=5,
                        help='Number of pieces in a row to win (default: 5)')
+    parser.add_argument('--depth', type=int, default=4,
+                       help='Search depth for alpha_beta players (default: 4, range: 2-10)')
     parser.add_argument('--verbose', action='store_true',
                        help='Print progress during evaluation')
     
@@ -164,7 +166,8 @@ def main():
         wrapper_type=args.player1_type,
         model_path=args.player1_path,
         board_size=args.board_size,
-        bound=args.bound
+        bound=args.bound,
+        depth=args.depth
     )
 
     # Create player 2 using factory
@@ -172,7 +175,8 @@ def main():
         wrapper_type=args.player2_type,
         model_path=args.player2_path,
         board_size=args.board_size,
-        bound=args.bound
+        bound=args.bound,
+        depth=args.depth
     )
     
     # Run evaluation

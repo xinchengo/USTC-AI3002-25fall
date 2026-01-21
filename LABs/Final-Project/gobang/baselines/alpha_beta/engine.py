@@ -142,7 +142,7 @@ class AlphaBetaEngine:
             return max_eval
         else:
             min_eval = float('inf')
-            opponent = 3 - player
+            opponent = self.evaluator.get_opponent(player)
             for move in legal_moves:
                 row, col = move
                 board[row, col] = opponent
@@ -248,7 +248,7 @@ class AlphaBetaEngine:
         Returns:
             (row, col) if there's an immediate win/block, None otherwise
         """
-        opponent = 3 - player
+        opponent = self.evaluator.get_opponent(player)
         
         # First check for immediate wins
         for row, col in self._get_neighbor_moves(board, radius=2):

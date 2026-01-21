@@ -102,7 +102,8 @@ class AlphaBetaWrapper(BaseWrapper):
         
         # Softmax-like distribution (with temperature for smoother distribution)
         temperature = 1.0
-        exp_scores = np.exp(move_scores / (temperature * (np.max(move_scores) + 1)))
+        max_score = np.max(move_scores)
+        exp_scores = np.exp(move_scores / (temperature * (max_score + 1)))
         probabilities = exp_scores / np.sum(exp_scores)
         
         # Assign probabilities to the policy
