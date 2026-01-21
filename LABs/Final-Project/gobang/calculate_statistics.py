@@ -2,6 +2,10 @@
 """
 Script to calculate statistical results for the Gobang AI experiments.
 This ensures all calculations are done by executing Python scripts rather than internally in the LLM.
+
+[TODO(AGENT)]: output format from .4f --> exponential for very small p-values
+    [LINKUPDATE log.md]
+
 """
 
 import numpy as np

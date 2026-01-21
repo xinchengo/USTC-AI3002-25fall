@@ -65,6 +65,10 @@ Notes:
 
 - 'The evaluated models play black half of the time' is satisfied since the evaluator alternates who goes first (episode % 2 == 0 for player 1, episode % 2 == 1 for player 2)
 
+### Is the CNN significantly better than random policy?
+
+<DO A SIGNIFICANCE TEST THAT COMPARES THE BASELINE CNN WITH THE RANDOM POLICY>
+
 ### Has the CNN improved significantly with depth increase?
 
 **If they haven't converged, return to last step, increase the number of epochs and try again.**

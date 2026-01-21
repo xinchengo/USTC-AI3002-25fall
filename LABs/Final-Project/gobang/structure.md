@@ -69,10 +69,10 @@ python submission.py --num_episodes 1000 --checkpoint 500 --use_deep
 
 ### Evaluation between any two players
 ```bash
-python tests/evaluator.py --player1_path checkpoints/model_999.pkl --player1_type checkpoint --player2_type random --episodes 100
+python -m test.evaluator --player1_path checkpoints/model_999.pkl --player1_type checkpoint --player2_type random --episodes 100
 ```
 
 ### Human vs AI gameplay
 ```bash
-python tests/human_play.py --model_path checkpoints/final_model.pkl --ai_player 1
+python -m test.human_play --model_path checkpoints/final_model.pkl --ai_player 1
 ```
