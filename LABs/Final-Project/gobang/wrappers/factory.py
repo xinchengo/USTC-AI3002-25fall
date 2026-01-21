@@ -6,6 +6,7 @@ This allows test scripts to be truly wrapper-agnostic.
 from .checkpoint import CheckpointWrapper
 from .random import RandomWrapper
 from .baseline import BaselineWrapper
+from .alpha_beta import AlphaBetaWrapper
 
 
 def create_wrapper(wrapper_type, **kwargs):
@@ -13,7 +14,7 @@ def create_wrapper(wrapper_type, **kwargs):
     Factory function to create wrapper instances based on type.
 
     Args:
-        wrapper_type (str): Type of wrapper to create ('checkpoint', 'random', 'baseline')
+        wrapper_type (str): Type of wrapper to create ('checkpoint', 'random', 'baseline', 'alpha_beta')
         **kwargs: Arguments to pass to the wrapper constructor
 
     Returns:
@@ -47,8 +48,14 @@ def create_wrapper(wrapper_type, **kwargs):
         bound = kwargs.get('bound', 5)
         return BaselineWrapper(board_size=board_size, bound=bound)
 
+    elif wrapper_type == 'alpha_beta':
+        board_size = kwargs.get('board_size', 12)
+        bound = kwargs.get('bound', 5)
+        difficulty = kwargs.get('difficulty', 'medium')
+        return AlphaBetaWrapper(board_size=board_size, bound=bound, difficulty=difficulty)
+
     else:
-        raise ValueError(f"Unknown wrapper type: {wrapper_type}. Supported types: checkpoint, random, baseline")
+        raise ValueError(f"Unknown wrapper type: {wrapper_type}. Supported types: checkpoint, random, baseline, alpha_beta")
 
 
-__all__ = ['create_wrapper', 'BaseWrapper', 'CheckpointWrapper', 'RandomWrapper', 'BaselineWrapper']
+__all__ = ['create_wrapper', 'BaseWrapper', 'CheckpointWrapper', 'RandomWrapper', 'BaselineWrapper', 'AlphaBetaWrapper']

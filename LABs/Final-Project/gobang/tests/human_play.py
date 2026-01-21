@@ -6,11 +6,16 @@ Input your move in the format: 2,3
 """
 
 from __future__ import print_function
+import sys
+import os
+
+# Add parent directory to path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import numpy as np
 from wrappers import create_wrapper
 from utils import Gobang, _position_to_index, _index_to_position
 import argparse
-import os
 
 
 class Human:
@@ -49,7 +54,7 @@ class Human:
         return "Human {}".format(self.player)
 
 
-def run(board_size=12, bound=5, model_path=None, ai_type='checkpoint'):
+def run(board_size=12, bound=5, model_path=None, ai_type='checkpoint', difficulty='medium'):
     """
     Run human vs AI game
     """
@@ -63,9 +68,10 @@ def run(board_size=12, bound=5, model_path=None, ai_type='checkpoint'):
             wrapper_type=ai_type,
             model_path=model_path,
             board_size=board_size,
-            bound=bound
+            bound=bound,
+            difficulty=difficulty
         )
-        print(f"Using {ai_type} AI")
+        print(f"Using {ai_type} AI" + (f" (difficulty: {difficulty})" if ai_type == 'alpha_beta' else ""))
 
         # Create human player
         human = Human(board_size=board_size)
@@ -144,8 +150,10 @@ def main():
     parser = argparse.ArgumentParser(description='Human vs AI Gobang Game')
     parser.add_argument('--model_path', type=str, default=None,
                        help='Path to AI model (.pth or .pkl file)')
-    parser.add_argument('--ai_type', type=str, choices=['checkpoint', 'random', 'baseline'], default='checkpoint',
+    parser.add_argument('--ai_type', type=str, choices=['checkpoint', 'random', 'baseline', 'alpha_beta'], default='checkpoint',
                        help='Type of AI player (default: checkpoint)')
+    parser.add_argument('--difficulty', type=str, choices=['weak', 'easy', 'medium', 'hard'], default='medium',
+                       help='Difficulty for alpha_beta AI (default: medium)')
     parser.add_argument('--board_size', type=int, default=12,
                        help='Size of the board (default: 12)')
     parser.add_argument('--bound', type=int, default=5,
@@ -153,8 +161,9 @@ def main():
 
     args = parser.parse_args()
 
-    # Pass ai_type to run function
-    run(board_size=args.board_size, bound=args.bound, model_path=args.model_path, ai_type=args.ai_type)
+    # Pass ai_type and difficulty to run function
+    run(board_size=args.board_size, bound=args.bound, model_path=args.model_path, 
+        ai_type=args.ai_type, difficulty=args.difficulty)
 
 
 if __name__ == "__main__":

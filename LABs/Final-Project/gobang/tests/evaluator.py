@@ -1,10 +1,15 @@
+import sys
+import os
+
+# Add parent directory to path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import numpy as np
 from typing import Tuple, Dict, Any
 from wrappers import create_wrapper
 from utils import Gobang
 from tqdm import tqdm
 import argparse
-import os
 
 
 class GeneralEvaluator:
@@ -141,10 +146,14 @@ def main():
                        help='Path to player 1 model (.pth or .pkl file)')
     parser.add_argument('--player2_path', type=str, default=None,
                        help='Path to player 2 model (.pth or .pkl file)')
-    parser.add_argument('--player1_type', type=str, choices=['checkpoint', 'random', 'baseline'], default='checkpoint',
+    parser.add_argument('--player1_type', type=str, choices=['checkpoint', 'random', 'baseline', 'alpha_beta'], default='checkpoint',
                        help='Type of player 1 (default: checkpoint)')
-    parser.add_argument('--player2_type', type=str, choices=['checkpoint', 'random', 'baseline'], default='random',
+    parser.add_argument('--player2_type', type=str, choices=['checkpoint', 'random', 'baseline', 'alpha_beta'], default='random',
                        help='Type of player 2 (default: random)')
+    parser.add_argument('--player1_difficulty', type=str, choices=['weak', 'easy', 'medium', 'hard'], default='medium',
+                       help='Difficulty for player 1 if alpha_beta (default: medium)')
+    parser.add_argument('--player2_difficulty', type=str, choices=['weak', 'easy', 'medium', 'hard'], default='medium',
+                       help='Difficulty for player 2 if alpha_beta (default: medium)')
     parser.add_argument('--episodes', type=int, default=100,
                        help='Number of episodes to evaluate (default: 100)')
     parser.add_argument('--board_size', type=int, default=12,
@@ -164,7 +173,8 @@ def main():
         wrapper_type=args.player1_type,
         model_path=args.player1_path,
         board_size=args.board_size,
-        bound=args.bound
+        bound=args.bound,
+        difficulty=args.player1_difficulty
     )
 
     # Create player 2 using factory
@@ -172,7 +182,8 @@ def main():
         wrapper_type=args.player2_type,
         model_path=args.player2_path,
         board_size=args.board_size,
-        bound=args.bound
+        bound=args.bound,
+        difficulty=args.player2_difficulty
     )
     
     # Run evaluation
