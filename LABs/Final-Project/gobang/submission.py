@@ -348,9 +348,16 @@ if __name__ == "__main__":
     # 传递 save_dir 给 train_model
     train_model(agent, num_episodes=num_episodes, checkpoint=checkpoint, save_dir=save_folder)
 
+    import pickle
     # 保存 最终模型
     final_model_path = os.path.join(save_folder, 'final_model.pth')
     torch.save(agent.state_dict(), final_model_path)
+
+    # 保存完整模型对象为pickle文件
+    final_pickle_path = os.path.join(save_folder, 'final_model.pkl')
+    with open(final_pickle_path, 'wb') as f:
+        pickle.dump(agent, f)
+
     # 保存超参数
     hyperparams_path = os.path.join(save_folder, 'hyperparameters.txt')
     with open(hyperparams_path, 'w') as f:

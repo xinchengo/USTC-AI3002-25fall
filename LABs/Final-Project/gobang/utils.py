@@ -358,6 +358,11 @@ def train_model(model, num_episodes=1000, checkpoint=1000, gamma=0.5, save_dir="
             os.makedirs(save_dir, exist_ok=True)
             torch.save(model.state_dict(), f"{save_dir}/model_{_}.pth")
 
+            # Also save the complete model object as pickle
+            import pickle
+            with open(f"{save_dir}/model_{_}.pkl", 'wb') as f:
+                pickle.dump(model, f)
+
 
 __all__ = ['_position_to_index', '_index_to_position', '_sample_response', 'train_model',
            '_sample_action_and_response', '_get_next_state', 'UtilGobang', 'Gobang', 'device']
