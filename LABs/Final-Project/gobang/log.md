@@ -9,6 +9,7 @@ Plan for the gobang Actor-Critic Reinforcement Learning task
 - Use `uv pip` for package management
 - scripts in `tests/` folder are intended to be called with `python -m test.<...> <...>` inside the `gobang` directory
 - You should follow my plan to automatically execute scripts for my experiment
+- Numerical calculations should be done by executing Python scripts in the terminal, do not calculate inside LLM.
 
 ## First part, Plain CNN
 
@@ -43,7 +44,8 @@ $$
 \begin{gather}
 H_0:p=0.5\leftrightarrow H_1:p\ne 0.5\\
 X=\sum_{i=1}^{500} X_i = 245\\
-p=0.655>0.01
+\text{Rejection Threshold:} |X-250| > 2.576 \times \sqrt{500 \times 0.5 \times 0.5} \approx 28.8\\
+p=0.655 > 0.01
 \end{gather}
 $$
 
@@ -53,9 +55,14 @@ $$
 \begin{gather}
 H_0:p=0.5\leftrightarrow H_1:p\ne 0.5\\
 X=\sum_{i=1}^{500} X_i = 254\\
-p=0.720>0.01
+\text{Rejection Threshold:} |X-250| > 2.576 \times \sqrt{500 \times 0.5 \times 0.5} \approx 28.8\\
+p=0.720 >0.01
 \end{gather}
 $$
+
+Notes:
+
+- 'The evaluated models play black half of the time' is satisfied since the evaluator alternates who goes first (episode % 2 == 0 for player 1, episode % 2 == 1 for player 2)
 
 ### Has the CNN improved significantly with depth increase?
 
@@ -76,7 +83,12 @@ python -m tests.evaluator --player1_path checkpoints/gobang_model_20260121-10235
 
 Results
 
-
-- Regular CNN wins: 6 (6\%)
-- Deep CNN wins: 94 (94\%)
-- The deep CNN significantly outperforms the regular CNN.
+$$
+\begin{gather}
+H_0:p_1=p_2\leftrightarrow H_1:p_1\ne p_2\\
+\hat p_1 = 0.06,\quad \hat p_2 = 0.94\\
+Z=\left[\hat p_1 (1-\hat p_1)+\hat p_2 (1 - \hat p_2)\over n\right]^{-\frac12}|\hat p_1 - \hat p_2|\sim N(0,1)\\
+Z = \left[\frac{0.06 \times 0.94 + 0.94 \times 0.06}{100}\right]^{-\frac{1}{2}}|0.06 - 0.94| = \left[\frac{0.1128}{100}\right]^{-\frac{1}{2}} \times 0.88 \approx 26.24\\
+p < 0.001
+\end{gather}
+$$
