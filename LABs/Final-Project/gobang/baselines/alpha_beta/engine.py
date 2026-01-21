@@ -1,294 +1,230 @@
 """
-Alpha-Beta Minimax Search Engine for Gobang
-Implements the minimax algorithm with alpha-beta pruning for efficient search
+Minimax Engine for Gobang - Exact translation from lihongxun945/gobang minmax.js
+Implements iterative deepening minimax with alpha-beta pruning, VCT and VCF
 """
 
-import numpy as np
-from typing import Tuple, List, Optional
-from .evaluator import BoardEvaluator
-import time
+from typing import List, Tuple, Optional, Dict, Any
+from .evaluator import BoardEvaluator, FIVE, FOUR
 
 
-class AlphaBetaEngine:
-    """
-    Alpha-Beta pruning search engine for Gobang.
-    Implements minimax with alpha-beta pruning and configurable depth.
-    """
+MAX = 1000000000
+
+# Cache statistics
+cache_hits = {
+    'search': 0,
+    'total': 0,
+    'hit': 0
+}
+
+ONLY_THREE_THRESHOLD = 6
+
+
+class Cache:
+    """FIFO cache - exact translation from cache.js"""
     
-    def __init__(self, board_size: int = 12, bound: int = 5, depth: int = 4):
-        """
-        Initialize the alpha-beta engine.
-        
-        Args:
-            board_size: Size of the board (default 12)
-            bound: Number of pieces in a row to win (default 5)
-            depth: Search depth (default 4, can be 2-10)
-        """
-        self.board_size = board_size
-        self.bound = bound
-        self.depth = depth
-        self.evaluator = BoardEvaluator(board_size, bound)
-        
-        # Statistics
-        self.nodes_searched = 0
-        self.nodes_pruned = 0
+    def __init__(self, capacity: int = 1000000):
+        self.capacity = capacity
+        self.cache = []  # FIFO queue of keys
+        self.map = {}  # key -> value mapping
     
-    def get_best_move(self, board: np.ndarray, player: int) -> Tuple[int, int]:
-        """
-        Get the best move for the given player using alpha-beta search.
-        
-        Args:
-            board: Current board state
-            player: Player to move (1 or 2)
-            
-        Returns:
-            Tuple of (row, col) representing the best move
-        """
-        self.nodes_searched = 0
-        self.nodes_pruned = 0
-        
-        # Get legal moves
-        legal_moves = self._get_legal_moves(board)
-        
-        if not legal_moves:
-            return -1, -1
-        
-        # Quick win/block check
-        quick_move = self._check_immediate_win_or_block(board, player)
-        if quick_move is not None:
-            return quick_move
-        
-        # Use alpha-beta search to find the best move
-        best_move = None
-        best_value = float('-inf')
-        alpha = float('-inf')
-        beta = float('inf')
-        
-        # Sort moves by heuristic value (most promising first)
-        legal_moves = self._sort_moves(board, legal_moves, player)
-        
-        for move in legal_moves:
-            row, col = move
-            # Try this move
-            board[row, col] = player
-            
-            # Evaluate with alpha-beta
-            value = self._minimax(board, self.depth - 1, alpha, beta, False, player)
-            
-            # Undo the move
-            board[row, col] = 0
-            
-            # Update best move
-            if value > best_value:
-                best_value = value
-                best_move = move
-            
-            # Update alpha
-            alpha = max(alpha, best_value)
-        
-        return best_move if best_move is not None else legal_moves[0]
-    
-    def _minimax(self, board: np.ndarray, depth: int, alpha: float, beta: float, 
-                 is_maximizing: bool, player: int) -> float:
-        """
-        Minimax algorithm with alpha-beta pruning.
-        
-        Args:
-            board: Current board state
-            depth: Remaining search depth
-            alpha: Alpha value for pruning
-            beta: Beta value for pruning
-            is_maximizing: Whether this is a maximizing node
-            player: The player we're optimizing for
-            
-        Returns:
-            Evaluated score for this position
-        """
-        self.nodes_searched += 1
-        
-        # Terminal conditions
-        if depth == 0:
-            return self.evaluator.evaluate(board, player)
-        
-        # Check for game over
-        if self._is_game_over(board):
-            return self.evaluator.evaluate(board, player)
-        
-        legal_moves = self._get_legal_moves(board)
-        if not legal_moves:
-            return self.evaluator.evaluate(board, player)
-        
-        # Sort moves for better pruning
-        current_player = player if is_maximizing else (3 - player)
-        legal_moves = self._sort_moves(board, legal_moves, current_player)
-        
-        if is_maximizing:
-            max_eval = float('-inf')
-            for move in legal_moves:
-                row, col = move
-                board[row, col] = player
-                
-                eval_score = self._minimax(board, depth - 1, alpha, beta, False, player)
-                
-                board[row, col] = 0
-                
-                max_eval = max(max_eval, eval_score)
-                alpha = max(alpha, eval_score)
-                
-                if beta <= alpha:
-                    self.nodes_pruned += 1
-                    break  # Beta cutoff
-            
-            return max_eval
-        else:
-            min_eval = float('inf')
-            opponent = self.evaluator.get_opponent(player)
-            for move in legal_moves:
-                row, col = move
-                board[row, col] = opponent
-                
-                eval_score = self._minimax(board, depth - 1, alpha, beta, True, player)
-                
-                board[row, col] = 0
-                
-                min_eval = min(min_eval, eval_score)
-                beta = min(beta, eval_score)
-                
-                if beta <= alpha:
-                    self.nodes_pruned += 1
-                    break  # Alpha cutoff
-            
-            return min_eval
-    
-    def _get_legal_moves(self, board: np.ndarray) -> List[Tuple[int, int]]:
-        """
-        Get all legal moves (empty positions).
-        
-        Args:
-            board: Current board state
-            
-        Returns:
-            List of (row, col) tuples for legal moves
-        """
-        empty_positions = np.where(board == 0)
-        return list(zip(empty_positions[0], empty_positions[1]))
-    
-    def _get_neighbor_moves(self, board: np.ndarray, radius: int = 2) -> List[Tuple[int, int]]:
-        """
-        Get moves that are near existing pieces (for better move ordering).
-        
-        Args:
-            board: Current board state
-            radius: Radius around existing pieces to consider
-            
-        Returns:
-            List of (row, col) tuples for moves near existing pieces
-        """
-        occupied_positions = np.where(board != 0)
-        occupied_set = set(zip(occupied_positions[0], occupied_positions[1]))
-        
-        if not occupied_set:
-            # If board is empty, return center position
-            center = self.board_size // 2
-            return [(center, center)]
-        
-        neighbor_moves = set()
-        
-        for row, col in occupied_set:
-            for dr in range(-radius, radius + 1):
-                for dc in range(-radius, radius + 1):
-                    new_row, new_col = row + dr, col + dc
-                    if (0 <= new_row < self.board_size and 
-                        0 <= new_col < self.board_size and 
-                        board[new_row, new_col] == 0):
-                        neighbor_moves.add((new_row, new_col))
-        
-        return list(neighbor_moves)
-    
-    def _sort_moves(self, board: np.ndarray, moves: List[Tuple[int, int]], 
-                    player: int) -> List[Tuple[int, int]]:
-        """
-        Sort moves by heuristic value for better alpha-beta pruning.
-        
-        Args:
-            board: Current board state
-            moves: List of moves to sort
-            player: Player to evaluate for
-            
-        Returns:
-            Sorted list of moves (best first)
-        """
-        # If too many moves, only consider neighbors
-        if len(moves) > 50:
-            moves = self._get_neighbor_moves(board)
-        
-        move_scores = []
-        for move in moves:
-            row, col = move
-            # Quick evaluation: place the piece and evaluate
-            board[row, col] = player
-            score = self.evaluator.evaluate(board, player)
-            board[row, col] = 0
-            move_scores.append((score, move))
-        
-        # Sort by score (descending)
-        move_scores.sort(reverse=True, key=lambda x: x[0])
-        
-        return [move for score, move in move_scores]
-    
-    def _check_immediate_win_or_block(self, board: np.ndarray, 
-                                      player: int) -> Optional[Tuple[int, int]]:
-        """
-        Check for immediate winning moves or blocking opponent's winning moves.
-        
-        Args:
-            board: Current board state
-            player: Current player
-            
-        Returns:
-            (row, col) if there's an immediate win/block, None otherwise
-        """
-        opponent = self.evaluator.get_opponent(player)
-        
-        # First check for immediate wins
-        for row, col in self._get_neighbor_moves(board, radius=2):
-            board[row, col] = player
-            if self.evaluator.check_win(board, row, col, player):
-                board[row, col] = 0
-                return (row, col)
-            board[row, col] = 0
-        
-        # Then check for immediate blocks
-        for row, col in self._get_neighbor_moves(board, radius=2):
-            board[row, col] = opponent
-            if self.evaluator.check_win(board, row, col, opponent):
-                board[row, col] = 0
-                return (row, col)
-            board[row, col] = 0
-        
+    def get(self, key: int) -> Optional[Dict[str, Any]]:
+        """Get value for a key"""
+        if key in self.map:
+            return self.map[key]
         return None
     
-    def _is_game_over(self, board: np.ndarray) -> bool:
+    def put(self, key: int, value: Dict[str, Any]):
+        """Set or insert a value"""
+        if len(self.cache) >= self.capacity:
+            oldest_key = self.cache.pop(0)  # Remove oldest key
+            del self.map[oldest_key]  # Delete from map
+        
+        if key not in self.map:
+            self.cache.append(key)  # Add new key to cache
+        self.map[key] = value  # Update or set key-value
+    
+    def has(self, key: int) -> bool:
+        """Check if key exists in cache"""
+        return key in self.map
+
+
+# Global cache shared by minmax, vct, and vcf
+cache = Cache()
+
+
+def factory(only_three: bool = False, only_four: bool = False):
+    """
+    Factory function to create minimax variants.
+    
+    Args:
+        only_three: VCT mode (only three and four patterns)
+        only_four: VCF mode (only four patterns)
+    
+    Returns:
+        Helper function configured for the specified mode
+    """
+    
+    def helper(evaluator: BoardEvaluator, role: int, depth: int, c_depth: int = 0,
+               path: List[Tuple[int, int]] = None, alpha: float = -MAX, beta: float = MAX
+               ) -> Tuple[float, Optional[Tuple[int, int]], List[Tuple[int, int]]]:
         """
-        Check if the game is over (someone won or board is full).
+        Minimax helper with iterative deepening and alpha-beta pruning.
         
         Args:
-            board: Current board state
-            
+            evaluator: Board evaluator
+            role: Current player (1 or -1)
+            depth: Total search depth
+            c_depth: Current search depth
+            path: Current path of moves
+            alpha: Alpha value for pruning
+            beta: Beta value for pruning
+        
         Returns:
-            True if game is over, False otherwise
+            Tuple of (value, move, best_path)
         """
-        # Check if board is full
-        if not np.any(board == 0):
-            return True
+        if path is None:
+            path = []
         
-        # Quick check for any winning patterns
-        # This is a simplified check - could be optimized
-        for player in [1, 2]:
-            for row in range(self.board_size):
-                for col in range(self.board_size):
-                    if board[row, col] == player:
-                        if self.evaluator.check_win(board, row, col, player):
-                            return True
+        cache_hits['search'] += 1
         
-        return False
+        # Terminal condition
+        if c_depth >= depth or evaluator.is_game_over():
+            return evaluator.evaluate(role), None, path.copy()
+        
+        # Check cache
+        hash_value = evaluator.hash()
+        prev = cache.get(hash_value)
+        if prev and prev['role'] == role:
+            # Can use cache if it's a winning position or has sufficient depth
+            # and mode matches (only_three/only_four)
+            if ((abs(prev['value']) >= FIVE or prev['depth'] >= depth - c_depth) and
+                prev['only_three'] == only_three and prev['only_four'] == only_four):
+                cache_hits['hit'] += 1
+                return prev['value'], prev['move'], path + prev['path']
+        
+        value = -MAX
+        move = None
+        best_path = path.copy()
+        best_depth = 0
+        
+        # Get valuable moves
+        points = evaluator.get_moves(role, c_depth,
+                                    only_three or c_depth > ONLY_THREE_THRESHOLD,
+                                    only_four)
+        
+        if c_depth == 0:
+            print(f'points: {points}')
+        
+        if not points:
+            return evaluator.evaluate(role), None, path.copy()
+        
+        # Iterative deepening - only search even depths
+        for d in range(c_depth + 1, depth + 1):
+            # Only search even depths (己方能赢的解)
+            if d % 2 != 0:
+                continue
+            
+            break_all = False
+            
+            for point in points:
+                evaluator.move(point[0], point[1], role)
+                new_path = path + [point]
+                
+                current_value, current_move, current_path = helper(
+                    evaluator, -role, d, c_depth + 1, new_path, -beta, -alpha
+                )
+                current_value = -current_value
+                
+                evaluator.undo(point[0], point[1])
+                
+                # During iterative deepening, only accept winning moves or final depth
+                # Reason: Non-winning evaluations are inaccurate at shallow depths
+                if current_value >= FIVE or d == depth:
+                    # For losing positions, choose the longest path (struggle)
+                    if (current_value > value or
+                        (current_value <= -FIVE and value <= -FIVE and
+                         len(current_path) > best_depth)):
+                        value = current_value
+                        move = point
+                        best_path = current_path
+                        best_depth = len(current_path)
+                
+                alpha = max(alpha, value)
+                
+                # Break if we found a winning move
+                if alpha >= FIVE:
+                    break_all = True
+                    break
+                
+                # Alpha-beta pruning
+                if alpha >= beta:
+                    break
+            
+            if break_all:
+                break
+        
+        # Cache the result
+        if ((c_depth < ONLY_THREE_THRESHOLD or only_three or only_four) and
+            (not prev or prev['depth'] < depth - c_depth)):
+            cache_hits['total'] += 1
+            cache.put(hash_value, {
+                'depth': depth - c_depth,  # Remaining depth
+                'value': value,
+                'move': move,
+                'role': role,
+                'path': best_path[c_depth:],  # Remaining path
+                'only_three': only_three,
+                'only_four': only_four
+            })
+        
+        return value, move, best_path
+    
+    return helper
+
+
+# Create the three search variants
+_minmax = factory()
+vct = factory(only_three=True)
+vcf = factory(only_four=True)
+
+
+def minmax(evaluator: BoardEvaluator, role: int, depth: int = 4, enable_vct: bool = True
+           ) -> Tuple[float, Optional[Tuple[int, int]], List[Tuple[int, int]]]:
+    """
+    Main minimax search with VCT (Variable-depth Continuous Threat).
+    
+    Args:
+        evaluator: Board evaluator
+        role: Current player (1 or -1)
+        depth: Search depth (default 4)
+        enable_vct: Enable VCT search (default True)
+    
+    Returns:
+        Tuple of (value, move, best_path)
+    """
+    if enable_vct:
+        vct_depth = depth + 8
+        
+        # First check if we have a winning sequence
+        value, move, best_path = vct(evaluator, role, vct_depth)
+        if value >= FIVE:
+            return value, move, best_path
+        
+        # Do regular minimax search
+        value, move, best_path = _minmax(evaluator, role, depth)
+        
+        # Check if opponent has a winning sequence after our move
+        # If we move and opponent's winning path becomes longer, our move is good
+        # If opponent's path stays same or shorter, we should block instead
+        evaluator.move(move[0], move[1], role)
+        value2, move2, best_path2 = vct(evaluator.reverse(), role, vct_depth)
+        evaluator.undo(move[0], move[1])
+        
+        if value < FIVE and value2 == FIVE and len(best_path2) > len(best_path):
+            value3, move3, best_path3 = vct(evaluator.reverse(), role, vct_depth)
+            if len(best_path2) <= len(best_path3):
+                return value, move2, best_path2  # Use value (not value2) as it's blocked
+        
+        return value, move, best_path
+    else:
+        return _minmax(evaluator, role, depth)
