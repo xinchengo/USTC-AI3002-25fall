@@ -141,9 +141,9 @@ def main():
                        help='Path to player 1 model (.pth or .pkl file)')
     parser.add_argument('--player2_path', type=str, default=None,
                        help='Path to player 2 model (.pth or .pkl file)')
-    parser.add_argument('--player1_type', type=str, choices=['checkpoint', 'random', 'baseline'], default='checkpoint',
+    parser.add_argument('--player1_type', type=str, choices=['checkpoint', 'random', 'baseline', 'alpha_beta'], default='checkpoint',
                        help='Type of player 1 (default: checkpoint)')
-    parser.add_argument('--player2_type', type=str, choices=['checkpoint', 'random', 'baseline'], default='random',
+    parser.add_argument('--player2_type', type=str, choices=['checkpoint', 'random', 'baseline', 'alpha_beta'], default='random',
                        help='Type of player 2 (default: random)')
     parser.add_argument('--episodes', type=int, default=100,
                        help='Number of episodes to evaluate (default: 100)')
