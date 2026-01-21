@@ -6,6 +6,7 @@ import torch.nn as nn
 from typing import *
 import sys
 import argparse
+import json
 
 
 class Actor(nn.Module):
@@ -15,10 +16,15 @@ class Actor(nn.Module):
     as the generated policy.
     """
 
-    def __init__(self, board_size: int, lr=1e-4, use_deep=False):
+    def __init__(self, board_size: int, lr=1e-4, model_type: str = "default", extra_specs: dict = None):
         super().__init__()
         self.board_size = board_size
-        self.use_deep = use_deep  # 标记是否使用深层网络
+        self.model_type = model_type
+        self.extra_specs = extra_specs or {}
+
+        # Default values for backward compatibility
+        use_deep = self.extra_specs.get('use_deep', False)
+
         """
         # Define your NN structures here. Torch modules have to be registered during the initialization process.
         # For example, you can define CNN structures as follows:
@@ -53,8 +59,54 @@ class Actor(nn.Module):
         """
 
         # BEGIN YOUR CODE
-        if not self.use_deep:
-            # Architecture 1: Baseline CNN (3-Layer)
+        if model_type == "default":
+            if not use_deep:
+                # Architecture 1: Baseline CNN (3-Layer)
+                self.conv_blocks = nn.Sequential(
+                    nn.Conv2d(1, 32, kernel_size=3, padding=1),
+                    nn.ReLU(),
+                    nn.Conv2d(32, 64, kernel_size=3, padding=1),
+                    nn.ReLU(),
+                    nn.Conv2d(64, 128, kernel_size=3, padding=1),
+                    nn.ReLU()
+                )
+                flat_features = 128 * board_size * board_size
+            else:
+                # Architecture 2: Deep CNN (5-Layer)
+                self.conv_blocks = nn.Sequential(
+                    nn.Conv2d(1, 64, kernel_size=3, padding=1),
+                    nn.ReLU(),
+                    nn.Conv2d(64, 128, kernel_size=3, padding=1),
+                    nn.ReLU(),
+                    nn.Conv2d(128, 128, kernel_size=3, padding=1),
+                    nn.ReLU(),
+                    nn.Conv2d(128, 256, kernel_size=3, padding=1),
+                    nn.ReLU(),
+                    nn.Conv2d(256, 256, kernel_size=3, padding=1),
+                    nn.ReLU()
+                )
+                flat_features = 256 * board_size * board_size
+
+            self.fc = nn.Linear(flat_features, board_size * board_size)
+        elif model_type == "custom":
+            # Allow custom architecture based on extra_specs
+            channels = self.extra_specs.get('channels', [32, 64, 128])
+            kernel_size = self.extra_specs.get('kernel_size', 3)
+            padding = self.extra_specs.get('padding', 1)
+
+            conv_layers = []
+            in_channels = 1
+
+            for out_channels in channels:
+                conv_layers.append(nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=padding))
+                conv_layers.append(nn.ReLU())
+                in_channels = out_channels
+
+            self.conv_blocks = nn.Sequential(*conv_layers)
+            flat_features = channels[-1] * board_size * board_size
+            self.fc = nn.Linear(flat_features, board_size * board_size)
+        else:
+            # Default to baseline architecture if unknown model type
             self.conv_blocks = nn.Sequential(
                 nn.Conv2d(1, 32, kernel_size=3, padding=1),
                 nn.ReLU(),
@@ -64,23 +116,8 @@ class Actor(nn.Module):
                 nn.ReLU()
             )
             flat_features = 128 * board_size * board_size
-        else:
-            # Architecture 2: Deep CNN (5-Layer)
-            self.conv_blocks = nn.Sequential(
-                nn.Conv2d(1, 64, kernel_size=3, padding=1),
-                nn.ReLU(),
-                nn.Conv2d(64, 128, kernel_size=3, padding=1),
-                nn.ReLU(),
-                nn.Conv2d(128, 128, kernel_size=3, padding=1),
-                nn.ReLU(),
-                nn.Conv2d(128, 256, kernel_size=3, padding=1),
-                nn.ReLU(),
-                nn.Conv2d(256, 256, kernel_size=3, padding=1),
-                nn.ReLU()
-            )
-            flat_features = 256 * board_size * board_size
-        
-        self.fc = nn.Linear(flat_features, board_size * board_size)
+            self.fc = nn.Linear(flat_features, board_size * board_size)
+
         # END YOUR CODE
 
         # Define your optimizer here, which is responsible for calculating the gradients and performing optimizations.
@@ -234,15 +271,14 @@ class GobangModel(nn.Module):
     and action tensors "action", it directly outputs self.actor(x) and self.critic(x, action) as the policy and Q-values
     respectively.
     """
-    # 增加 use_deep 参数
-    def __init__(self, board_size: int, bound: int, use_deep=False):
+    def __init__(self, board_size: int, bound: int, model_type: str = "default", extra_specs: dict = None):
         super().__init__()
         self.bound = bound
         self.board_size = board_size
 
         """
         Register the actor and critic modules here. You do not need to further design the structures at this step.
-        Feel free to add extra parameters in the __init__ method of either the Actor class or the Critic class for your 
+        Feel free to add extra parameters in the __init__ method of either the Actor class or the Critic class for your
         convenience, if necessary.
         """
 
@@ -250,7 +286,7 @@ class GobangModel(nn.Module):
         # self.actor = Actor(board_size=board_size, ...)
         # self.critic = Critic(board_size=board_size, ...)
         # Register Actor and Critic
-        self.actor = Actor(board_size=board_size, use_deep=use_deep)
+        self.actor = Actor(board_size=board_size, model_type=model_type, extra_specs=extra_specs)
         self.critic = Critic(board_size=board_size)
         # END YOUR CODE
 
@@ -301,8 +337,21 @@ if __name__ == "__main__":
     parser.add_argument('--use_wandb', action='store_true', help='use wandb for experiment tracking (requires wandb installed)')
     parser.add_argument('--wandb_project', type=str, default='gobang-rl-AI3002', help='wandb project name')
     parser.add_argument('--wandb_name', type=str, default=None, help='wandb run name')
-    parser.add_argument('--use_deep', action='store_true', help='use deep cnn architecture') # 新增定义 use_deep
+    parser.add_argument('--model-type', type=str, default='default', dest='model_type', help='model architecture type')
+    parser.add_argument('--extra-specs', type=str, default='{}', dest='extra_specs', help='extra specifications as JSON string')
     args = parser.parse_args()
+
+    # Parse extra_specs from JSON string
+    try:
+        extra_specs = json.loads(args.extra_specs)
+    except json.JSONDecodeError:
+        print(f"Invalid JSON for extra_specs: {args.extra_specs}")
+        extra_specs = {}
+        # Check if args.extra_specs is a boolean flag (for backward compatibility)
+        if args.extra_specs.lower() in ('true', '1', 'yes', 'on'):
+            extra_specs = {'use_deep': True}
+        elif args.extra_specs.lower() in ('false', '0', 'no', 'off'):
+            extra_specs = {'use_deep': False}
 
     # 确保 num_episodes 和 checkpoint 有值
     num_episodes = args.num_episodes if args.num_episodes is not None else 1000
@@ -333,16 +382,17 @@ if __name__ == "__main__":
         except ImportError:
             pass
         
-    agent = GobangModel(board_size=12, bound=5, use_deep=args.use_deep).to(device)
-    print(f"Model initialized. Use Deep CNN: {args.use_deep}")
+    agent = GobangModel(board_size=12, bound=5, model_type=args.model_type, extra_specs=extra_specs).to(device)
+    print(f"Model initialized. Model Type: {args.model_type}, Extra Specs: {extra_specs}")
     # 打印模型参数量
     total_params = sum(p.numel() for p in agent.parameters() if p.requires_grad)
     print(f"Total trainable parameters: {total_params}")
-    
-    # 根据是否使用 deep 决定保存路径
+
+    # 根据模型类型决定保存路径
     from time import strftime, localtime
     timestamp = strftime("%Y%m%d-%H%M%S", localtime())
-    save_folder = f'checkpoints/{"deep_" if args.use_deep else ""}gobang_model_{timestamp}'
+    use_deep = extra_specs.get('use_deep', False)
+    save_folder = f'checkpoints/{args.model_type}_{"deep_" if use_deep else ""}gobang_model_{timestamp}'
     print(f"Models will be saved to: {save_folder}")
     os.makedirs(save_folder, exist_ok=True)
     # 传递 save_dir 给 train_model
@@ -363,7 +413,8 @@ if __name__ == "__main__":
     with open(hyperparams_path, 'w') as f:
         f.write(f'num_episodes: {num_episodes}\n')
         f.write(f'checkpoint: {checkpoint}\n')
-        f.write(f'use_deep: {args.use_deep}\n')
+        f.write(f'model_type: {args.model_type}\n')
+        f.write(f'extra_specs: {extra_specs}\n')
     
     if args.use_wandb:
         try:

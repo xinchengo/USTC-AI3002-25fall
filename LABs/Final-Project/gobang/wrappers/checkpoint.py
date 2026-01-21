@@ -16,7 +16,7 @@ class CheckpointWrapper(BaseWrapper):
     This wrapper allows loading both .pth (state dict) and .pkl (complete model) files.
     """
 
-    def __init__(self, model_path: str, board_size: int = 12, bound: int = 5, use_deep: bool = False):
+    def __init__(self, model_path: str, board_size: int = 12, bound: int = 5, model_type: str = "default", extra_specs: dict = None, use_deep: bool = False):
         """
         Initialize the checkpoint wrapper.
 
@@ -24,13 +24,21 @@ class CheckpointWrapper(BaseWrapper):
             model_path: Path to the model file (.pth or .pkl)
             board_size: Size of the board (default 12)
             bound: Number of pieces in a row to win (default 5)
-            use_deep: Whether to use deep architecture (for .pth files)
+            model_type: Model architecture type (default "default")
+            extra_specs: Extra specifications for model architecture (dict)
+            use_deep: Whether to use deep architecture (for backward compatibility)
         """
         self.board_size = board_size
         self.bound = bound
+        self.model_type = model_type
+        self.extra_specs = extra_specs or {}
 
         # Determine if this is a deep model by checking hyperparameters or filename
-        is_deep = use_deep or 'deep' in model_path.lower()
+        is_deep = use_deep or self.extra_specs.get('use_deep', False) or 'deep' in model_path.lower()
+
+        # For backward compatibility, if model_type is default and use_deep is True, update extra_specs
+        if model_type == "default" and is_deep:
+            self.extra_specs['use_deep'] = True
 
         if model_path.endswith('.pkl'):
             # Load complete model object
@@ -60,7 +68,13 @@ class CheckpointWrapper(BaseWrapper):
         elif model_path.endswith('.pth'):
             # Load state dict and reconstruct model
             from submission import GobangModel
-            self.model = GobangModel(board_size=board_size, bound=bound, use_deep=is_deep)
+            # For backward compatibility, determine model type from filename if not specified
+            if model_type == "default" and ('deep' in model_path.lower()):
+                actual_extra_specs = {'use_deep': True}
+            else:
+                actual_extra_specs = self.extra_specs
+
+            self.model = GobangModel(board_size=board_size, bound=bound, model_type=self.model_type, extra_specs=actual_extra_specs)
             state_dict = torch.load(model_path, map_location=device)
             self.model.load_state_dict(state_dict)
             self.model.to(device)
