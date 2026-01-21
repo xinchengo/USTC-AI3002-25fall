@@ -1,3 +1,4 @@
+import os
 from utils import *
 import numpy as np
 import torch
@@ -54,25 +55,29 @@ class Actor(nn.Module):
         # BEGIN YOUR CODE
         if not self.use_deep:
             # Architecture 1: Baseline CNN (3-Layer)
-            self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
-            self.relu1 = nn.ReLU()
-            self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
-            self.relu2 = nn.ReLU()
-            self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
-            self.relu3 = nn.ReLU()
+            self.conv_blocks = nn.Sequential(
+                nn.Conv2d(1, 32, kernel_size=3, padding=1),
+                nn.ReLU(),
+                nn.Conv2d(32, 64, kernel_size=3, padding=1),
+                nn.ReLU(),
+                nn.Conv2d(64, 128, kernel_size=3, padding=1),
+                nn.ReLU()
+            )
             flat_features = 128 * board_size * board_size
         else:
             # Architecture 2: Deep CNN (5-Layer)
-            self.conv1 = nn.Conv2d(1, 64, kernel_size=3, padding=1)
-            self.relu1 = nn.ReLU()
-            self.conv2 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
-            self.relu2 = nn.ReLU()
-            self.conv3 = nn.Conv2d(128, 128, kernel_size=3, padding=1)
-            self.relu3 = nn.ReLU()
-            self.conv4 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
-            self.relu4 = nn.ReLU()
-            self.conv5 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
-            self.relu5 = nn.ReLU()
+            self.conv_blocks = nn.Sequential(
+                nn.Conv2d(1, 64, kernel_size=3, padding=1),
+                nn.ReLU(),
+                nn.Conv2d(64, 128, kernel_size=3, padding=1),
+                nn.ReLU(),
+                nn.Conv2d(128, 128, kernel_size=3, padding=1),
+                nn.ReLU(),
+                nn.Conv2d(128, 256, kernel_size=3, padding=1),
+                nn.ReLU(),
+                nn.Conv2d(256, 256, kernel_size=3, padding=1),
+                nn.ReLU()
+            )
             flat_features = 256 * board_size * board_size
         
         self.fc = nn.Linear(flat_features, board_size * board_size)
@@ -124,16 +129,7 @@ class Actor(nn.Module):
         else: output = x
         
         # 1. 网络前向传播：通过卷积层提取特征
-        if not self.use_deep:
-            out = self.relu1(self.conv1(output))
-            out = self.relu2(self.conv2(out))
-            out = self.relu3(self.conv3(out))
-        else:
-            out = self.relu1(self.conv1(output))
-            out = self.relu2(self.conv2(out))
-            out = self.relu3(self.conv3(out))
-            out = self.relu4(self.conv4(out))
-            out = self.relu5(self.conv5(out))
+        out = self.conv_blocks(output)
         
         # 2. 展平张量：从 (B, Channels, N, N) 变为 (B, Channels*N*N)
         out = out.view(out.size(0), -1)
@@ -186,12 +182,14 @@ class Critic(nn.Module):
 
         # BEGIN YOUR CODE
         # 神经网络结构
-        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
-        self.relu1 = nn.ReLU()
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
-        self.relu2 = nn.ReLU()
-        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
-        self.relu3 = nn.ReLU()
+        self.conv_blocks = nn.Sequential(
+            nn.Conv2d(1, 32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.ReLU()
+        )
         
         # 为棋盘上的每个位置生成一个Q值
         self.fc = nn.Linear(128 * board_size * board_size, board_size * board_size)
@@ -214,9 +212,7 @@ class Critic(nn.Module):
 
         # BEGIN YOUR CODE
         # 前向传播
-        out = self.relu1(self.conv1(output))
-        out = self.relu2(self.conv2(out))
-        out = self.relu3(self.conv3(out))
+        out = self.conv_blocks(output)
         
         out = out.view(out.size(0), -1)
         
@@ -339,11 +335,28 @@ if __name__ == "__main__":
         
     agent = GobangModel(board_size=12, bound=5, use_deep=args.use_deep).to(device)
     print(f"Model initialized. Use Deep CNN: {args.use_deep}")
+    # 打印模型参数量
+    total_params = sum(p.numel() for p in agent.parameters() if p.requires_grad)
+    print(f"Total trainable parameters: {total_params}")
     
     # 根据是否使用 deep 决定保存路径
-    save_folder = "checkpoints_deep" if args.use_deep else "checkpoints_baseline"
+    from time import strftime, localtime
+    timestamp = strftime("%Y%m%d-%H%M%S", localtime())
+    save_folder = f'checkpoints/{"deep_" if args.use_deep else ""}gobang_model_{timestamp}'
+    print(f"Models will be saved to: {save_folder}")
+    os.makedirs(save_folder, exist_ok=True)
     # 传递 save_dir 给 train_model
     train_model(agent, num_episodes=num_episodes, checkpoint=checkpoint, save_dir=save_folder)
+
+    # 保存 最终模型
+    final_model_path = os.path.join(save_folder, 'final_model.pth')
+    torch.save(agent.state_dict(), final_model_path)
+    # 保存超参数
+    hyperparams_path = os.path.join(save_folder, 'hyperparameters.txt')
+    with open(hyperparams_path, 'w') as f:
+        f.write(f'num_episodes: {num_episodes}\n')
+        f.write(f'checkpoint: {checkpoint}\n')
+        f.write(f'use_deep: {args.use_deep}\n')
     
     if args.use_wandb:
         try:

@@ -147,6 +147,7 @@ class UtilGobang:
                 (-1, False))
 
     def evaluate_agent_performance(self, random_response, model, opponent, episodes=1000):
+
         opponent_name = "random noise" if random_response else "training model itself"
         print(f"Start evaluating with opponent {opponent_name}.")
         self.model, self.opponent = model, opponent
@@ -160,11 +161,11 @@ class UtilGobang:
                                                 (black_wins + 1, white_wins, ties) if color == 1 else
                                                 (black_wins, white_wins + 1, ties))
                 if end_up_gaming:
-                    print(f"Black wins: {black_wins}, white wins: {white_wins}, and ties: {ties}.")
-                    print(
-                        f"The evaluated winning probability for the black pieces is "
-                        f"{black_wins / (black_wins + white_wins + ties)}."
-                    )
+                    # print(f"Black wins: {black_wins}, white wins: {white_wins}, and ties: {ties}.")
+                    # print(
+                    #     f"The evaluated winning probability for the black pieces is "
+                    #     f"{black_wins / (black_wins + white_wins + ties)}."
+                    # )
                     break
         self.restart()
         print(f"Evaluation finished. Black wins: {black_wins}, white wins: {white_wins}, and ties: {ties}.")

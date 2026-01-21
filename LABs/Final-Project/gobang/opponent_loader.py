@@ -15,7 +15,7 @@ bound = 5
 # parameters, so that we can directly call get_model() in player.py and evaluator.py.
 
 
-def get_opponent():
+def get_opponent(model_path: str = 'opponent.pth') -> nn.Module:
     # BEGIN YOUR CODE
     # from submission import GobangModel
     # opponent = GobangModel(board_size=board_size, bound=bound)
@@ -23,7 +23,7 @@ def get_opponent():
     # return opponent
     model = GobangModel(board_size=board_size, bound=bound, use_deep=False)
     
-    model_path = 'opponent.pth' 
+    model_path = model_path
     
     if os.path.exists(model_path):
         state_dict = torch.load(model_path, map_location=device)

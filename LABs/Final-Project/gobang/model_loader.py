@@ -15,7 +15,7 @@ bound = 5
 # parameters, so that we can directly call get_model() in player.py and evaluator.py.
 
 
-def get_model():
+def get_model(model_path: str = 'model.pth') -> nn.Module:
     # from submission import GobangModel
     # model = GobangModel(board_size=board_size, bound=bound)
     # model.load_state_dict(torch.load('model.pth'))
@@ -24,7 +24,7 @@ def get_model():
     model = GobangModel(board_size=board_size, bound=bound, use_deep=True)
     
     # 定义模型权重文件路径
-    model_path = 'model.pth'
+    model_path = model_path
     if os.path.exists(model_path):
         state_dict = torch.load(model_path, map_location=device)
         model.load_state_dict(state_dict)

@@ -9,15 +9,15 @@ if __name__ == "__main__":
     parser.add_argument('--model_path', type=str, default='model.pth', help='Path to the trained model for black pieces.')
     parser.add_argument('--opponent_path', type=str, default='opponent.pth', help='Path to the opponent model for white pieces.')
     args = parser.parse_args()
-    
+
     # Define gaming settings.
     board_size = 12
     bound = 5
     num_episodes = 1000
 
     # Load trained models for black pieces and opponents for white pieces.
-    model = get_model()
-    opponent = get_opponent()
+    model = get_model(args.model_path)
+    opponent = get_opponent(args.opponent_path)
 
     model.eval()
     opponent.eval()
