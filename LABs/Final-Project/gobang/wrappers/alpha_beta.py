@@ -5,15 +5,7 @@ Wrapper that exposes the alpha-beta pruning engine through the standard wrapper 
 
 import numpy as np
 from typing import Tuple
-import sys
-import os
-
-# Add the parent directory to path to import base wrapper
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from base import BaseWrapper
-
-# Import the alpha-beta engine
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+from .base import BaseWrapper
 from baselines.alpha_beta import AlphaBetaEngine
 
 
