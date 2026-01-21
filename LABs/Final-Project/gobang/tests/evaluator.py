@@ -1,7 +1,6 @@
 import numpy as np
 from typing import Tuple, Dict, Any
-from wrappers.checkpoint import CheckpointWrapper
-from wrappers.random import RandomWrapper
+from wrappers import create_wrapper
 from utils import Gobang
 from tqdm import tqdm
 import argparse
@@ -142,9 +141,9 @@ def main():
                        help='Path to player 1 model (.pth or .pkl file)')
     parser.add_argument('--player2_path', type=str, default=None,
                        help='Path to player 2 model (.pth or .pkl file)')
-    parser.add_argument('--player1_type', type=str, choices=['checkpoint', 'random'], default='checkpoint',
+    parser.add_argument('--player1_type', type=str, choices=['checkpoint', 'random', 'baseline'], default='checkpoint',
                        help='Type of player 1 (default: checkpoint)')
-    parser.add_argument('--player2_type', type=str, choices=['checkpoint', 'random'], default='random',
+    parser.add_argument('--player2_type', type=str, choices=['checkpoint', 'random', 'baseline'], default='random',
                        help='Type of player 2 (default: random)')
     parser.add_argument('--episodes', type=int, default=100,
                        help='Number of episodes to evaluate (default: 100)')
@@ -160,33 +159,21 @@ def main():
     # Initialize evaluator
     evaluator = GeneralEvaluator(board_size=args.board_size, bound=args.bound)
     
-    # Create player 1
-    if args.player1_type == 'checkpoint':
-        if args.player1_path and os.path.exists(args.player1_path):
-            player1 = CheckpointWrapper(
-                model_path=args.player1_path,
-                board_size=args.board_size,
-                bound=args.bound
-            )
-        else:
-            print("Player 1 path not provided or doesn't exist, using random player")
-            player1 = RandomWrapper(board_size=args.board_size, bound=args.bound)
-    else:  # random
-        player1 = RandomWrapper(board_size=args.board_size, bound=args.bound)
-    
-    # Create player 2
-    if args.player2_type == 'checkpoint':
-        if args.player2_path and os.path.exists(args.player2_path):
-            player2 = CheckpointWrapper(
-                model_path=args.player2_path,
-                board_size=args.board_size,
-                bound=args.bound
-            )
-        else:
-            print("Player 2 path not provided or doesn't exist, using random player")
-            player2 = RandomWrapper(board_size=args.board_size, bound=args.bound)
-    else:  # random
-        player2 = RandomWrapper(board_size=args.board_size, bound=args.bound)
+    # Create player 1 using factory
+    player1 = create_wrapper(
+        wrapper_type=args.player1_type,
+        model_path=args.player1_path,
+        board_size=args.board_size,
+        bound=args.bound
+    )
+
+    # Create player 2 using factory
+    player2 = create_wrapper(
+        wrapper_type=args.player2_type,
+        model_path=args.player2_path,
+        board_size=args.board_size,
+        bound=args.bound
+    )
     
     # Run evaluation
     print(f"Evaluating {args.player1_type} vs {args.player2_type} for {args.episodes} episodes...")

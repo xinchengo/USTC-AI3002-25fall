@@ -3,13 +3,14 @@ import pickle
 import numpy as np
 from typing import Tuple, Optional
 from utils import device
+from .base import BaseWrapper
 
 
 # Import the required classes to handle pickle loading
 from submission import GobangModel, Actor, Critic
 
 
-class CheckpointWrapper:
+class CheckpointWrapper(BaseWrapper):
     """
     A wrapper for loading and using checkpointed models.
     This wrapper allows loading both .pth (state dict) and .pkl (complete model) files.

@@ -1,9 +1,10 @@
 import numpy as np
 from typing import Tuple
 import random
+from .base import BaseWrapper
 
 
-class RandomWrapper:
+class RandomWrapper(BaseWrapper):
     """
     A wrapper for a random policy that selects moves uniformly at random
     from available legal moves.

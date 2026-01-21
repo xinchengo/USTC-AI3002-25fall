@@ -7,8 +7,7 @@ Input your move in the format: 2,3
 
 from __future__ import print_function
 import numpy as np
-from wrappers.checkpoint import CheckpointWrapper
-from wrappers.random import RandomWrapper
+from wrappers import create_wrapper
 from utils import Gobang, _position_to_index, _index_to_position
 import argparse
 import os
@@ -31,25 +30,26 @@ class Human:
         Get human player's move via console input.
         Input format: 2,3 (row, column)
         """
-        try:
-            location = input("Your move (row,col): ")
-            if isinstance(location, str):  # for python3
-                location = [int(n, 10) for n in location.split(",")]
-            if len(location) != 2:
-                raise ValueError("Invalid input length")
-            move = _position_to_index(self.board_size, location[0], location[1])
-        except Exception as e:
-            move = -1
-        if move == -1 or move not in [i * self.board_size + j for i in range(self.board_size) for j in range(self.board_size) if board[i][j] == 0]:
-            print("Invalid move")
-            move = self.get_action(board)
-        return move
+        while True:
+            try:
+                location = input("Your move (row,col): ")
+                if isinstance(location, str):  # for python3
+                    location = [int(n, 10) for n in location.split(",")]
+                if len(location) != 2:
+                    raise ValueError("Invalid input length")
+                move = _position_to_index(self.board_size, location[0], location[1])
+            except Exception as e:
+                move = -1
+            if move == -1 or move not in [i * self.board_size + j for i in range(self.board_size) for j in range(self.board_size) if board[i][j] == 0]:
+                print("Invalid move")
+                continue  # Ask for input again
+            return move
 
     def __str__(self):
         return "Human {}".format(self.player)
 
 
-def run(board_size=12, bound=5, model_path=None):
+def run(board_size=12, bound=5, model_path=None, ai_type='checkpoint'):
     """
     Run human vs AI game
     """
@@ -58,17 +58,14 @@ def run(board_size=12, bound=5, model_path=None):
         game_board = Gobang(board_size=board_size, bound=bound, training=False)
         game_board.restart()
 
-        # Create AI player
-        if model_path and os.path.exists(model_path):
-            ai_wrapper = CheckpointWrapper(
-                model_path=model_path,
-                board_size=board_size,
-                bound=bound
-            )
-            print(f"Using AI model: {model_path}")
-        else:
-            ai_wrapper = RandomWrapper(board_size=board_size, bound=bound)
-            print("Using random AI (no model provided)")
+        # Create AI player using factory
+        ai_wrapper = create_wrapper(
+            wrapper_type=ai_type,
+            model_path=model_path,
+            board_size=board_size,
+            bound=bound
+        )
+        print(f"Using {ai_type} AI")
 
         # Create human player
         human = Human(board_size=board_size)
@@ -147,6 +144,8 @@ def main():
     parser = argparse.ArgumentParser(description='Human vs AI Gobang Game')
     parser.add_argument('--model_path', type=str, default=None,
                        help='Path to AI model (.pth or .pkl file)')
+    parser.add_argument('--ai_type', type=str, choices=['checkpoint', 'random', 'baseline'], default='checkpoint',
+                       help='Type of AI player (default: checkpoint)')
     parser.add_argument('--board_size', type=int, default=12,
                        help='Size of the board (default: 12)')
     parser.add_argument('--bound', type=int, default=5,
@@ -154,7 +153,8 @@ def main():
 
     args = parser.parse_args()
 
-    run(board_size=args.board_size, bound=args.bound, model_path=args.model_path)
+    # Pass ai_type to run function
+    run(board_size=args.board_size, bound=args.bound, model_path=args.model_path, ai_type=args.ai_type)
 
 
 if __name__ == "__main__":

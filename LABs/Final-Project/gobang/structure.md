@@ -37,8 +37,10 @@ gobang/
 ### Wrappers
 Extensible wrapper system for different player types:
 
+- **BaseWrapper**: Abstract base class defining the common interface for all wrappers
 - **CheckpointWrapper**: Loads and interfaces with trained models (both .pth and .pkl formats)
 - **RandomWrapper**: Implements a random policy for baseline comparison
+- **BaselineWrapper**: Implements a simple baseline policy (e.g., alpha-beta pruning or heuristic-based)
 
 ### Tests
 Enhanced evaluation system:
