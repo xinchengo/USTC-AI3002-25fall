@@ -74,27 +74,39 @@ class AlphaBetaWrapper(BaseWrapper):
         # Create new board
         self._board = Board(size=self.board_size, first_role=1)
         
-        # Count pieces to determine turn order
-        count_1 = np.sum(board_state == 1)
-        count_2 = np.sum(board_state == 2)
-        
         # Reconstruct history by scanning the board
-        # This is a simplification - we place pieces in order of count
-        # For proper reconstruction, we'd need the actual move history
+        # We need to interleave pieces from both players
+        # Black (1) always moves first, then white (2) alternates
         pieces_1 = list(zip(*np.where(board_state == 1)))
         pieces_2 = list(zip(*np.where(board_state == 2)))
         
-        # Place pieces alternating, starting with whoever has more or equal pieces
+        # Interleave pieces - black moves first, then white alternates
+        # The order within each player's pieces doesn't matter for evaluation
+        # since we only care about the final position
         i, j = 0, 0
+        move_count = 0
         while i < len(pieces_1) or j < len(pieces_2):
-            if i < len(pieces_1) and (j >= len(pieces_2) or i <= j):
-                r, c = pieces_1[i]
-                self._board.put(r, c, 1)  # Player 1 = black = 1
-                i += 1
-            if j < len(pieces_2) and i > j:
-                r, c = pieces_2[j]
-                self._board.put(r, c, -1)  # Player 2 = white = -1
-                j += 1
+            if move_count % 2 == 0:  # Black's turn (player 1)
+                if i < len(pieces_1):
+                    r, c = pieces_1[i]
+                    self._board.put(r, c, 1)
+                    i += 1
+                elif j < len(pieces_2):
+                    # Black has no more pieces but white does - shouldn't happen in valid game
+                    r, c = pieces_2[j]
+                    self._board.put(r, c, -1)
+                    j += 1
+            else:  # White's turn (player 2)
+                if j < len(pieces_2):
+                    r, c = pieces_2[j]
+                    self._board.put(r, c, -1)
+                    j += 1
+                elif i < len(pieces_1):
+                    # White has no more pieces but black does - shouldn't happen in valid game
+                    r, c = pieces_1[i]
+                    self._board.put(r, c, 1)
+                    i += 1
+            move_count += 1
     
     def _convert_role(self, player_role: int) -> int:
         """
