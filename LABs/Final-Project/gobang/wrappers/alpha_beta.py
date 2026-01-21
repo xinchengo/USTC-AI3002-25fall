@@ -29,7 +29,7 @@ class AlphaBetaWrapper(BaseWrapper):
         self.board_size = board_size
         self.bound = bound
         self.depth = max(2, min(10, depth))  # Clamp depth to 2-10 range
-        self.evaluator = BoardEvaluator(size=board_size)
+        self.evaluator = BoardEvaluator(size=board_size, bound=bound)
     
     def get_action(self, board_state: np.ndarray, **kwargs) -> Tuple[int, int]:
         """
@@ -78,7 +78,7 @@ class AlphaBetaWrapper(BaseWrapper):
             player: Current player to move
         """
         # Reset evaluator
-        self.evaluator = BoardEvaluator(size=self.board_size)
+        self.evaluator = BoardEvaluator(size=self.board_size, bound=self.bound)
         
         # Replay moves in order
         # First, collect all pieces

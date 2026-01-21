@@ -49,9 +49,16 @@ class Human:
         return "Human {}".format(self.player)
 
 
-def run(board_size=12, bound=5, model_path=None, ai_type='checkpoint'):
+def run(board_size=12, bound=5, model_path=None, ai_type='checkpoint', depth=None):
     """
     Run human vs AI game
+    
+    Args:
+        board_size: Size of the board
+        bound: Number in a row to win
+        model_path: Path to model file (for checkpoint AI)
+        ai_type: Type of AI ('checkpoint', 'random', 'baseline', 'alpha_beta')
+        depth: Search depth (for alpha_beta AI, overrides default)
     """
     try:
         # Create game board
@@ -59,13 +66,21 @@ def run(board_size=12, bound=5, model_path=None, ai_type='checkpoint'):
         game_board.restart()
 
         # Create AI player using factory
-        ai_wrapper = create_wrapper(
-            wrapper_type=ai_type,
-            model_path=model_path,
-            board_size=board_size,
-            bound=bound
-        )
-        print(f"Using {ai_type} AI")
+        kwargs = {
+            'wrapper_type': ai_type,
+            'model_path': model_path,
+            'board_size': board_size,
+            'bound': bound
+        }
+        if depth is not None and ai_type == 'alpha_beta':
+            kwargs['depth'] = depth
+        
+        ai_wrapper = create_wrapper(**kwargs)
+        
+        if depth and ai_type == 'alpha_beta':
+            print(f"Using {ai_type} AI with depth={depth}")
+        else:
+            print(f"Using {ai_type} AI")
 
         # Create human player
         human = Human(board_size=board_size)
@@ -144,17 +159,31 @@ def main():
     parser = argparse.ArgumentParser(description='Human vs AI Gobang Game')
     parser.add_argument('--model_path', type=str, default=None,
                        help='Path to AI model (.pth or .pkl file)')
-    parser.add_argument('--ai_type', type=str, choices=['checkpoint', 'random', 'baseline'], default='checkpoint',
+    parser.add_argument('--ai_type', type=str, choices=['checkpoint', 'random', 'baseline', 'alpha_beta'], default='checkpoint',
                        help='Type of AI player (default: checkpoint)')
     parser.add_argument('--board_size', type=int, default=12,
                        help='Size of the board (default: 12)')
     parser.add_argument('--bound', type=int, default=5,
                        help='Number of pieces in a row to win (default: 5)')
+    parser.add_argument('--difficulty', type=str, choices=['weak', 'easy', 'medium', 'hard'], default=None,
+                       help='Difficulty level for alpha_beta AI (weak=depth 2, easy=depth 4, medium=depth 6, hard=depth 8)')
 
     args = parser.parse_args()
+    
+    # Map difficulty to depth for alpha_beta
+    depth = None
+    if args.difficulty:
+        difficulty_map = {
+            'weak': 2,
+            'easy': 4,
+            'medium': 6,
+            'hard': 8
+        }
+        depth = difficulty_map[args.difficulty]
 
-    # Pass ai_type to run function
-    run(board_size=args.board_size, bound=args.bound, model_path=args.model_path, ai_type=args.ai_type)
+    # Pass ai_type and depth to run function
+    run(board_size=args.board_size, bound=args.bound, model_path=args.model_path, 
+        ai_type=args.ai_type, depth=depth)
 
 
 if __name__ == "__main__":

@@ -153,10 +153,23 @@ def main():
                        help='Number of pieces in a row to win (default: 5)')
     parser.add_argument('--depth', type=int, default=4,
                        help='Search depth for alpha_beta players (default: 4, range: 2-10)')
+    parser.add_argument('--difficulty', type=str, choices=['weak', 'easy', 'medium', 'hard'], default=None,
+                       help='Difficulty level for alpha_beta players (weak=depth 2, easy=depth 4, medium=depth 6, hard=depth 8). Overrides --depth.')
     parser.add_argument('--verbose', action='store_true',
                        help='Print progress during evaluation')
     
     args = parser.parse_args()
+    
+    # Map difficulty to depth if specified
+    if args.difficulty:
+        difficulty_map = {
+            'weak': 2,
+            'easy': 4,
+            'medium': 6,
+            'hard': 8
+        }
+        args.depth = difficulty_map[args.difficulty]
+        print(f"Using difficulty={args.difficulty} (depth={args.depth})")
     
     # Initialize evaluator
     evaluator = GeneralEvaluator(board_size=args.board_size, bound=args.bound)

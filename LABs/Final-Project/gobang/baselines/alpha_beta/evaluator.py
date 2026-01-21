@@ -87,14 +87,19 @@ class BoardEvaluator:
     Evaluates Gobang board positions - exact translation from eval.js
     """
     
-    def __init__(self, size: int = 15):
+    def __init__(self, size: int = 15, bound: int = 5):
         """
         Initialize evaluator.
         
         Args:
             size: Board size (default 15, use 12 for our case)
+            bound: Win condition - number in a row to win (default 5)
+                   NOTE: Pattern detection is optimized for bound=5.
+                   Other values will work for win detection but tactical 
+                   evaluation may not be optimal.
         """
         self.size = size
+        self.bound = bound
         
         # Board with walls: (size+2) x (size+2)
         # Walls are marked as 2, empty as 0, black as 1, white as -1
@@ -514,7 +519,7 @@ class BoardEvaluator:
                 count += 1
                 r, c = r - dr, c - dc
             
-            if count >= 5:  # Using 5 as the bound
+            if count >= self.bound:
                 return True
         
         return False
