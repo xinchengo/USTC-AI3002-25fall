@@ -3,6 +3,13 @@
 ## Configs
 
 - When encountering `[TODO(AGENT)]`, no matter what you are doing, add this into your plan, resolve it, then remove this label. The `[LINKUPDATE]` flag indicates the other affected files of this todo.
+- The Python environment is a `uv` virtual environment located within `USTC-AI3002-25fall` (the repository root);
+- You should `source .venv/bin/activate` before running `python`
+- REMEMBER TO Use `uv pip` for package management, NEVER use `--break-system-flags` or use the system Python env,
+- REMEBER, use `uv pip install` etc.
+- scripts in `tests/` folder are intended to be called with `python -m test.<...> <...>` inside the `gobang` directory
+- You should follow my plan to automatically execute scripts for my experiment
+- Numerical calculations should be done by executing `calculate_statistics.py`, you should extend this file if necessary.
 
 ## Project Overview
 

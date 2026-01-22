@@ -11,6 +11,15 @@ Plan for the gobang Actor-Critic Reinforcement Learning task
 - You should follow my plan to automatically execute scripts for my experiment
 - Numerical calculations should be done by executing `calculate_statistics.py`, you should extend this file if necessary.
 
+For this file, complete this file in a consistent, rigorous format.
+
+For every experiments, reread the following lines:
+
+- Every experiment, three parts: steps, script, and results
+- Fill in the blanks, and the format should follow the contents and consistent with other already-filled-in experiment
+- Numerical calculation are done by modifying and executing `calculate_statistics.py`
+- Include all WanDB links for easier introspection
+
 ## First part, Plain CNN
 
 ### Has the CNN converged?
@@ -45,7 +54,6 @@ $$
 \begin{gather}
 H_0:p=0.5\leftrightarrow H_1:p\ne 0.5\\
 X=\sum_{i=1}^{500} X_i = 245\\
-\text{Rejection Threshold:} |X-250| > 28.80\\
 p=0.655 > 0.01
 \end{gather}
 $$
@@ -56,7 +64,6 @@ $$
 \begin{gather}
 H_0:p=0.5\leftrightarrow H_1:p\ne 0.5\\
 X=\sum_{i=1}^{500} X_i = 254\\
-\text{Rejection Threshold:} |X-250| > 28.80\\
 p=0.721 >0.01
 \end{gather}
 $$
@@ -67,11 +74,18 @@ Notes:
 
 ### Is the CNN significantly better than random policy?
 
-<DO A SIGNIFICANCE TEST THAT COMPARES THE BASELINE CNN WITH THE RANDOM POLICY>
+<TO BE FILLED IN: Play Baseline CNN Against Random Policy>
+
+<THEN DO A SIGNIFICANCE TEST THAT COMPARES THE BASELINE CNN WITH THE RANDOM POLICY>
 
 ### Has the CNN improved significantly with depth increase?
 
 **If they haven't converged, return to last step, increase the number of epochs and try again.**
+
+Before experiment, CNN has a comparible number of parameters:
+
+- Parameter count of regular CNN: <TO BE FILLED IN>
+- Parameter count of deep CNN: <TO BE FILLED IN>
 
 If the CNNs have both converged:
 
@@ -94,6 +108,26 @@ H_0:p_1=p_2\leftrightarrow H_1:p_1\ne p_2\\
 \hat p_1 = 0.06,\quad \hat p_2 = 0.94\\
 Z=\left[\hat p_1 (1-\hat p_1)+\hat p_2 (1 - \hat p_2)\over n\right]^{-\frac12}|\hat p_1 - \hat p_2|\sim N(0,1)\\
 Z = -12.45\\
-p=0.0000
+p=<TO BE FILLED IN>
 \end{gather}
 $$
+
+### Convergence Speed and the depth of CNN
+
+## Second Part, Shared backbone and separate backbone
+
+### Is there a significant performance difference 
+
+<!-- ## Third Part, Discount Factor
+
+### Does discount factor affect performance on Plain CNNs
+
+### Does discount factor affect performance on Residual CNNs
+
+### As the model grew complex, does the discrepancy increase?
+
+## Fourth Part, Residual CNN
+
+### Does Residual CNN outperforms regular CNN?
+
+### Depth and the performace discrepancy, a comparison -->
