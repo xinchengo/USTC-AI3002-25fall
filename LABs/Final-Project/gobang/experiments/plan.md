@@ -71,12 +71,12 @@ python submission.py --num_episodes 1500 --checkpoint 200 --use_wandb --wandb_na
 ```
 
 **Results**:
-- Baseline CNN (d=3, w=64) checkpoint folder: `checkpoints/cnn-baseline-d3-w64-late`
-- Deep CNN (d=5, w=64) checkpoint folder: `checkpoints/cnn-deep-d5-w64-late`
-- Baseline CNN parameter count: `2,804,064`
-- Deep CNN parameter count: `4,528,192`
-- Baseline CNN WandB link: `https://wandb.ai/xinchengo-ustc/gobang-rl-AI3002/runs/baseline-cnn-d3-w64-late`
-- Deep CNN WandB link: `https://wandb.ai/xinchengo-ustc/gobang-rl-AI3002/runs/deep-cnn-d5-w64-late`
+- <RECOMMENDATION>: `<TO BE FILLED IN>`
+- <RECOMMENDATION>: `<TO BE FILLED IN>`
+- <RECOMMENDATION>: `<TO BE FILLED IN>`
+- <RECOMMENDATION>: `<TO BE FILLED IN>`
+- <RECOMMENDATION>: `<TO BE FILLED IN>`
+- <RECOMMENDATION>: `<TO BE FILLED IN>`
 
 ---
 
@@ -104,8 +104,7 @@ $$
 \begin{gather}
 H_0:p=0.5 \leftrightarrow H_1:p\ne 0.5\\
 X=\sum_{i=1}^{500} X_i = \text{265}\\
-\text{p-value} = \text{0.089}\\
-\text{Conclusion: Fail to reject H_0, baseline model has converged (p > 0.01)}
+\text{p-value} = <TO BE FILLED IN>}\\
 \end{gather}
 $$
 
@@ -135,8 +134,7 @@ $$
 \begin{gather}
 H_0:p=0.5 \leftrightarrow H_1:p\ne 0.5\\
 X=\sum_{i=1}^{500} X_i = \text{265}\\
-\text{p-value} = \text{0.089}\\
-\text{Conclusion: Fail to reject H_0, baseline model has converged (p > 0.01)}
+\text{p-value} = <TO BE FILLED IN>\\
 \end{gather}
 $$
 
@@ -165,8 +163,8 @@ $$
 \begin{gather}
 H_0:p=0.5 \leftrightarrow H_1:p > 0.5\\
 \text{Baseline CNN wins: } \text{485}\\
-\text{p-value} = \text{1.2e-16}\\
-\text{Conclusion: Strong evidence that baseline CNN significantly outperforms random policy (p << 0.01)}
+\text{p-value} = <TO BE FILLED IN>\\
+\text{Conclusion: TO BE FILLED IN}
 \end{gather}
 $$
 
@@ -194,10 +192,10 @@ python -m tests.calculate_statistics  # Calculate Z-test
 $$
 \begin{gather}
 H_0:p_{\text{baseline}}=p_{\text{deep}} \leftrightarrow H_1:p_{\text{baseline}} \ne p_{\text{deep}}\\
-\hat p_{\text{baseline}} = \text{0.32}, \quad \hat p_{\text{deep}} = \text{0.68}\\
-Z = \text{-10.45}\\
-\text{p-value} = \text{1.8e-25}\\
-\text{Conclusion: Strong evidence that deep CNN significantly outperforms baseline CNN (p << 0.01)}
+\hat p_{\text{baseline}} = TO BE FILLED IN, \quad \hat p_{\text{deep}} = TO BE FILLED IN\\
+Z = TO BE FILLED IN\\
+\text{p-value} = TO BE FILLED IN\\
+\text{Conclusion: TO BE FILLED IN}
 \end{gather}
 $$
 
@@ -280,12 +278,12 @@ python -m tests.calculate_statistics  # Calculate tournament statistics
 **Results**:
 | Matchup | Player 1 Win Rate | Player 2 Win Rate | p-value | Winner |
 |---------|-------------------|-------------------|---------|--------|
-| d=2 vs d=3 | 0.38 | 0.62 | 0.008 | d=3 |
-| d=3 vs d=4 | 0.45 | 0.55 | 0.142 | d=4 |
-| d=4 vs d=5 | 0.42 | 0.58 | 0.034 | d=5 |
-| d=5 vs d=6 | 0.48 | 0.52 | 0.598 | Tie |
-| d=2 vs d=5 | 0.28 | 0.72 | 1.1e-6 | d=5 |
-| d=2 vs d=6 | 0.31 | 0.69 | 2.3e-7 | d=6 |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
 
 **Depth Scaling Analysis**:
 - Optimal depth: Depth 5 (best performance, with depth 6 showing minimal improvement)
@@ -408,11 +406,11 @@ python -m tests.calculate_statistics
 **Results**:
 | Matchup | Player 1 Win Rate | Player 2 Win Rate | p-value | Winner |
 |---------|-------------------|-------------------|---------|--------|
-| ch=16 vs ch=32 | 0.35 | 0.65 | 0.003 | ch=32 |
-| ch=32 vs ch=64 | 0.42 | 0.58 | 0.034 | ch=64 |
-| ch=64 vs ch=128 | 0.47 | 0.53 | 0.421 | Tie |
-| ch=128 vs ch=256 | 0.49 | 0.51 | 0.789 | Tie |
-| ch=16 vs ch=256 | 0.18 | 0.82 | 1.2e-12 | ch=256 |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
 
 ---
 
@@ -446,11 +444,11 @@ python -m tests.calculate_statistics
 **Results**:
 | Matchup | Player 1 Win Rate | Player 2 Win Rate | p-value | Winner |
 |---------|-------------------|-------------------|---------|--------|
-| ch=16 vs ch=32 | 0.35 | 0.65 | 0.003 | ch=32 |
-| ch=32 vs ch=64 | 0.42 | 0.58 | 0.034 | ch=64 |
-| ch=64 vs ch=128 | 0.47 | 0.53 | 0.421 | Tie |
-| ch=128 vs ch=256 | 0.49 | 0.51 | 0.789 | Tie |
-| ch=16 vs ch=256 | 0.18 | 0.82 | 1.2e-12 | ch=256 |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
 
 **Width Scaling Analysis**:
 - Optimal width at depth=3: Width 128-256 (performance plateaus after width 128)
@@ -479,9 +477,9 @@ python submission.py --num_episodes 1000 --checkpoint 200 --use_wandb --wandb_na
 ```
 
 **Results**:
-- BatchNorm checkpoint: `checkpoints/bn-d3-ch64-late`
-- BatchNorm params: `2,878,144`
-- WandB link: `https://wandb.ai/xinchengo-ustc/gobang-rl-AI3002/runs/bn-d3-ch64-late`
+- <RECOMMENDATION>: `<TO BE FILLED IN>`
+- <RECOMMENDATION>: `<TO BE FILLED IN>`
+- <RECOMMENDATION>: `<TO BE FILLED IN>`
 
 ---
 
@@ -503,11 +501,11 @@ python -m tests.calculate_statistics  # Statistical test
 $$
 \begin{gather}
 H_0:p_{\text{bn}}=p_{\text{no-bn}} \leftrightarrow H_1:p_{\text{bn}} \ne p_{\text{no-bn}}\\
-\text{BatchNorm win rate: } \text{0.54}\\
-\text{No-BatchNorm win rate: } \text{0.46}\\
-Z = \text{2.12}\\
-\text{p-value} = \text{0.034}\\
-\text{Conclusion: BatchNorm provides statistically significant improvement over no BatchNorm (p < 0.05)}
+\text{BatchNorm win rate: } TO BE FILLED IN\\
+\text{No-BatchNorm win rate: } TO BE FILLED IN\\
+Z = TO BE FILLED IN\\
+\text{p-value} = TO BE FILLED IN\\
+\text{Conclusion: TO BE FILLED IN}
 \end{gather}
 $$
 
@@ -585,12 +583,12 @@ python -m tests.calculate_statistics  # Tournament statistics
 **Results**:
 | Matchup | Player 1 Win Rate | Player 2 Win Rate | p-value | Winner |
 |---------|-------------------|-------------------|---------|--------|
-| None vs Early | 0.48 | 0.52 | 0.598 | Tie |
-| None vs Late | 0.42 | 0.58 | 0.034 | Late |
-| None vs FC | 0.45 | 0.55 | 0.142 | FC |
-| Early vs Late | 0.47 | 0.53 | 0.421 | Late |
-| Early vs FC | 0.51 | 0.49 | 0.789 | Tie |
-| Late vs FC | 0.53 | 0.47 | 0.341 | Late |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
 
 **Conclusion**: Late injection performs slightly better than other methods, with statistically insignificant differences between methods.
 
@@ -671,11 +669,11 @@ python -m tests.calculate_statistics  # Tournament statistics
 **Results**:
 | Matchup | Player 1 Win Rate | Player 2 Win Rate | p-value | Winner |
 |---------|-------------------|-------------------|---------|--------|
-| 1e-5 vs 5e-5 | 0.25 | 0.75 | 1.2e-7 | 5e-5 |
-| 5e-5 vs 1e-4 | 0.47 | 0.53 | 0.421 | 1e-4 |
-| 1e-4 vs 5e-4 | 0.52 | 0.48 | 0.678 | 1e-4 |
-| 5e-4 vs 1e-3 | 0.68 | 0.32 | 2.1e-6 | 5e-4 |
-| 1e-5 vs 1e-3 | 0.18 | 0.82 | 1.2e-12 | 1e-3 |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
 
 **Learning Rate Scaling Analysis**:
 - Optimal learning rate: 5e-4 (best balance of convergence speed and final performance)
@@ -752,10 +750,10 @@ python -m tests.calculate_statistics  # Tournament statistics
 **Results**:
 | Matchup | Player 1 Win Rate | Player 2 Win Rate | p-value | Winner |
 |---------|-------------------|-------------------|---------|--------|
-| γ=0.9 vs γ=0.95 | 0.38 | 0.62 | 0.008 | γ=0.95 |
-| γ=0.95 vs γ=0.99 | 0.45 | 0.55 | 0.142 | γ=0.99 |
-| γ=0.99 vs γ=0.999 | 0.52 | 0.48 | 0.678 | γ=0.99 |
-| γ=0.9 vs γ=0.999 | 0.32 | 0.68 | 2.1e-6 | γ=0.999 |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
+| <MATCHUP> | `<FILL>` | `<FILL>` | `<FILL>` | `<FILL>` |
 
 **Discount Factor Analysis**:
 - Optimal discount factor: γ=0.99 (best balance of short-term tactical play and long-term strategic planning)
@@ -798,77 +796,8 @@ python -m tests.calculate_statistics  # Final tournament rankings
 **Results**:
 | Rank | Model | Wins | Losses | Win Rate | Notes |
 |------|-------|------|--------|----------|-------|
-| 1 | width-d5-ch128-late | 42 | 8 | 0.84 | Best overall performer |
-| 2 | cnn-deep-d5-w64-late | 38 | 12 | 0.76 | Strong performer |
-| 3 | gamma-0.99-d3-ch64-late | 35 | 15 | 0.70 | Good strategic planning |
-| 4 | lr-5e-4-d3-ch64-late | 32 | 18 | 0.64 | Well-trained model |
-| 5 | cnn-baseline-d3-w64-late | 28 | 22 | 0.56 | Solid baseline |
-
----
-
-## Summary and Conclusions
-
-### Key Findings
-
-**Depth Effect**: Performance improves from depth 2 to 5, with diminishing returns after depth 5. Depth 5 provides optimal balance of performance and computational efficiency. Deeper networks (d=5) consistently outperform shallower ones (d=2, d=3) in head-to-head evaluations.
-
-**Width Effect**: Performance improves with width up to 128 channels, with diminishing returns beyond that. Width 128-256 provides similar performance. Networks with wider channels (128+) show improved pattern recognition capabilities compared to narrower ones (16-32).
-
-**Batch Normalization**: Provides modest but statistically significant improvement in training stability and final performance. Models with batch normalization showed more consistent convergence across different random seeds.
-
-**Action Injection Methods**: Late injection (before last conv layer) provides slight advantage over other methods, though differences are not dramatically significant. The placement of action information in the critic network affects how well the model can evaluate state-action pairs.
-
-**Learning Rate Impact**: Learning rate of 5e-4 provides best balance of convergence speed and final performance. Lower rates (1e-5, 5e-5) converge slowly, higher rates (1e-3) become unstable during training.
-
-**Discount Factor Effect**: γ=0.99 provides optimal balance of short-term tactical play and long-term strategic planning. Higher values (0.999) may overemphasize distant rewards, while lower values (0.9) focus too heavily on immediate gains.
-
-### Recommendations
-
-Based on the experimental results, the optimal configuration combines:
-- Depth: 5 (best performance-to-compute ratio)
-- Width: 128 (optimal performance without excessive parameters)
-- Batch normalization: Enabled (improves stability)
-- Action injection: Late (before last conv layer)
-- Learning rate: 5e-4 (best convergence characteristics)
-- Discount factor: γ=0.99 (optimal planning horizon)
-
-### Future Work
-
-Investigate the interaction effects between different hyperparameters, explore ensemble methods combining models with different architectures, test on different board sizes, and investigate more sophisticated action injection mechanisms.
-
----
-
-## Running the Full Experimental Suite
-
-### How to Execute All Experiments
-
-To run all experiments outlined in this plan, execute the provided script:
-
-```bash
-./run_experiments.sh
-```
-
-This script will:
-1. Train all models as specified in the experimental plan
-2. Evaluate models against each other as specified
-3. Generate logs of all results in the experiments/experiment_logs/ directory
-
-**Note**: The full experimental suite will take significant computational time and resources. Individual model training can take hours to days depending on your hardware.
-
-### Small-Scale Validation Test
-
-As part of validating the experimental plan, we conducted a small-scale test to ensure all components work correctly:
-
-**Validation Steps**:
-1. Trained a small CNN model (depth=3, channels=64, late injection) for 100 episodes
-2. Evaluated the trained model against a random player for 50 episodes
-3. Calculated statistics to verify the methodology
-
-**Validation Results**:
-- Training completed successfully with 2,804,064 parameters
-- Model achieved 100% win rate against random player (50/50 games won)
-- Factory system correctly loaded hyperparameters from training run
-- Evaluation system worked as expected
-- Statistical calculations validated
-
-**Validation Conclusion**: The experimental plan is correctly structured and all components work as expected. The training, evaluation, and statistical analysis pipelines are functional and ready for full-scale experiments.
+| 1 | <TO BE FILLED IN> | <TO BE FILLED IN> | <TO BE FILLED IN> | <TO BE FILLED IN> | <TO BE FILLED IN> |
+| 2 | <TO BE FILLED IN> | <TO BE FILLED IN> | <TO BE FILLED IN> | <TO BE FILLED IN> | <TO BE FILLED IN> |
+| 3 | <TO BE FILLED IN> | <TO BE FILLED IN> | <TO BE FILLED IN> | <TO BE FILLED IN> | <TO BE FILLED IN> |
+| 4 | <TO BE FILLED IN> | <TO BE FILLED IN> | <TO BE FILLED IN> | <TO BE FILLED IN> | <TO BE FILLED IN> |
+| 5 | <TO BE FILLED IN> | <TO BE FILLED IN> | <TO BE FILLED IN> | <TO BE FILLED IN> | <TO BE FILLED IN> |
