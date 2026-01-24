@@ -509,25 +509,3 @@ experiments:
               use_wandb: true
               wandb_name: "gamma-0.999-d3-ch64-late"
               gamma: 0.999
-
-  final_tournament:
-    name: "Final Tournament"
-    description: "Select top-performing models and run final tournament"
-    phases:
-      - name: "grand_tournament"
-        description: "Run round-robin tournament with top models"
-        evaluations:
-          - name: "top_models_tournament"
-            tournament_type: "round_robin"
-            participants:
-              - model: "width_128_d5"
-                checkpoint: "model_1499.pth"
-              - model: "deep_cnn_d5_w64"
-                checkpoint: "model_1499.pth"
-              - model: "gamma_099_model"
-                checkpoint: "model_999.pth"
-              - model: "lr_5e4_model"
-                checkpoint: "model_999.pth"
-              - model: "baseline_cnn_d3_w64"
-                checkpoint: "model_999.pth"
-            episodes_per_match: 500

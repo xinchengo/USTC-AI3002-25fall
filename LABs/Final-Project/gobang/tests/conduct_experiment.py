@@ -17,6 +17,7 @@ import numpy as np
 from pathlib import Path
 from datetime import datetime
 import tempfile
+import re
 
 
 def run_training(model_params, checkpoint_dir):
@@ -70,12 +71,40 @@ def run_training(model_params, checkpoint_dir):
         return None
     
     print(f"Training completed successfully: {result.stdout[-500:]}")  # Print last 500 chars of output
-    
-    # Return the checkpoint directory
-    return checkpoint_dir
+
+    # Prefer the stable wandb symlink if it exists, otherwise parse stdout or fall back
+    actual_checkpoint_dir = None
+
+    wandb_name = model_params.get("wandb_name")
+    if wandb_name:
+        # Normalize wandb_name: dots to underscores (submission.py does this for directory names)
+        normalized_name = re.sub(r'[^\w\-_]', '_', wandb_name)
+        wandb_link = Path("checkpoints") / normalized_name
+        if wandb_link.exists():
+            actual_checkpoint_dir = str(wandb_link)
+            print(f"Found wandb symlink: {actual_checkpoint_dir}")
+
+    if actual_checkpoint_dir is None:
+        match = re.search(r"Models will be saved to:\s*(.+)", result.stdout)
+        if match:
+            candidate = match.group(1).strip()
+            if Path(candidate).exists():
+                actual_checkpoint_dir = candidate
+                print(f"Parsed checkpoint dir from output: {actual_checkpoint_dir}")
+
+    if actual_checkpoint_dir is None:
+        # If no wandb symlink or stdout parsing, use the checkpoint_dir we passed in
+        if Path(checkpoint_dir).exists():
+            actual_checkpoint_dir = checkpoint_dir
+            print(f"Using checkpoint dir: {actual_checkpoint_dir}")
+        else:
+            print(f"Warning: Could not find checkpoint directory for {wandb_name or 'model'}")
+            actual_checkpoint_dir = checkpoint_dir
+
+    return actual_checkpoint_dir
 
 
-def run_evaluation(eval_params):
+def run_evaluation(eval_params, checkpoint_map=None):
     """
     Run model evaluation based on parameters
     
@@ -95,13 +124,38 @@ def run_evaluation(eval_params):
     if eval_params.get("player1") and not player1_path:
         model_name = eval_params["player1"]
         checkpoint_name = eval_params.get("player1_checkpoint", "model_999.pth")
-        player1_path = f"checkpoints/{model_name}/{checkpoint_name}"
+        mapped_dir = (checkpoint_map or {}).get(model_name)
+        if mapped_dir:
+            player1_path = os.path.join(mapped_dir, checkpoint_name)
+        else:
+            # Try to find wandb symlink by looking for common patterns
+            # Model names like baseline_cnn_d3_w64 might have symlinks like baseline-cnn-d3-w64-late
+            potential_symlink = model_name.replace("_", "-") + "-late"
+            symlink_path = Path("checkpoints") / potential_symlink
+            if symlink_path.exists():
+                player1_path = os.path.join(str(symlink_path), checkpoint_name)
+                checkpoint_map[model_name] = str(symlink_path)  # Cache for future use
+                print(f"Found symlink for {model_name}: {symlink_path}")
+            else:
+                player1_path = f"checkpoints/{model_name}/{checkpoint_name}"
     
     # If player2 is a named model, resolve to checkpoint
     if eval_params.get("player2") and not player2_path:
         model_name = eval_params["player2"]
         checkpoint_name = eval_params.get("player2_checkpoint", "model_999.pth")
-        player2_path = f"checkpoints/{model_name}/{checkpoint_name}"
+        mapped_dir = (checkpoint_map or {}).get(model_name)
+        if mapped_dir:
+            player2_path = os.path.join(mapped_dir, checkpoint_name)
+        else:
+            # Try to find wandb symlink by looking for common patterns
+            potential_symlink = model_name.replace("_", "-") + "-late"
+            symlink_path = Path("checkpoints") / potential_symlink
+            if symlink_path.exists():
+                player2_path = os.path.join(str(symlink_path), checkpoint_name)
+                checkpoint_map[model_name] = str(symlink_path)  # Cache for future use
+                print(f"Found symlink for {model_name}: {symlink_path}")
+            else:
+                player2_path = f"checkpoints/{model_name}/{checkpoint_name}"
     
     # If player2 is 'random', use baseline type
     if eval_params.get("player2") == "random":
@@ -225,13 +279,15 @@ def run_statistical_analysis(stats_params):
     }
 
 
-def conduct_experiment_phase(phase_config, results_dir):
+def conduct_experiment_phase(phase_config, results_dir, checkpoint_map=None, retry_failed=False):
     """
     Conduct a single experiment phase
     
     Args:
         phase_config (dict): Configuration for the phase
         results_dir (str): Directory to save results
+        checkpoint_map (dict): Map of model names to checkpoint directories
+        retry_failed (bool): If True, only run failed/missing experiments
         
     Returns:
         dict: Results of the phase
@@ -240,6 +296,14 @@ def conduct_experiment_phase(phase_config, results_dir):
     print(f"Conducting phase: {phase_name}")
     
     phase_results = {}
+    checkpoint_map = checkpoint_map if checkpoint_map is not None else {}
+    
+    # Load existing results if retry_failed is True
+    phase_result_file = os.path.join(results_dir, f"{phase_name}_results.json")
+    if retry_failed and os.path.exists(phase_result_file):
+        with open(phase_result_file, 'r') as f:
+            phase_results = json.load(f)
+        print(f"Loaded existing results from {phase_result_file}")
     
     # Handle different types of phases
     if "models" in phase_config:
@@ -247,6 +311,14 @@ def conduct_experiment_phase(phase_config, results_dir):
         for model_config in phase_config["models"]:
             model_name = model_config["name"]
             model_params = model_config["parameters"]
+            
+            # Skip if retry_failed is True and this model already succeeded
+            if retry_failed and model_name in phase_results:
+                existing = phase_results[model_name]
+                if existing.get("status") == "completed" and "checkpoint_dir" in existing:
+                    print(f"Skipping {model_name} (already completed)")
+                    checkpoint_map[model_name] = existing["checkpoint_dir"]
+                    continue
             
             print(f"Training model: {model_name}")
             
@@ -260,6 +332,7 @@ def conduct_experiment_phase(phase_config, results_dir):
                     "status": "completed",
                     "checkpoint_dir": model_path
                 }
+                checkpoint_map[model_name] = model_path
             else:
                 phase_results[model_name] = {
                     "status": "failed",
@@ -270,10 +343,18 @@ def conduct_experiment_phase(phase_config, results_dir):
         # Evaluation phase
         for eval_config in phase_config["evaluations"]:
             eval_name = eval_config["name"]
+            
+            # Skip if retry_failed is True and this evaluation already succeeded
+            if retry_failed and eval_name in phase_results:
+                existing = phase_results[eval_name]
+                if "error" not in existing and existing.get("total_games", 0) > 0:
+                    print(f"Skipping {eval_name} (already completed)")
+                    continue
+            
             print(f"Running evaluation: {eval_name}")
             
             # Run evaluation
-            eval_result = run_evaluation(eval_config)
+            eval_result = run_evaluation(eval_config, checkpoint_map)
             phase_results[eval_name] = eval_result
     
     elif "statistical_test" in phase_config:
@@ -289,13 +370,14 @@ def conduct_experiment_phase(phase_config, results_dir):
     return phase_results
 
 
-def conduct_experiment(experiment_config, results_dir):
+def conduct_experiment(experiment_config, results_dir, retry_failed=False):
     """
     Conduct a complete experiment based on configuration
     
     Args:
         experiment_config (dict): Configuration for the experiment
         results_dir (str): Directory to save results
+        retry_failed (bool): If True, only run failed/missing experiments
         
     Returns:
         dict: Overall results of the experiment
@@ -307,18 +389,35 @@ def conduct_experiment(experiment_config, results_dir):
     exp_results_dir = os.path.join(results_dir, exp_name.replace(" ", "_").replace("/", "_"))
     os.makedirs(exp_results_dir, exist_ok=True)
     
-    experiment_results = {
-        "experiment_name": exp_name,
-        "start_time": datetime.now().isoformat(),
-        "phases": {}
-    }
+    # Load existing experiment results if retry_failed
+    exp_result_file = os.path.join(exp_results_dir, "experiment_results.json")
+    if retry_failed and os.path.exists(exp_result_file):
+        with open(exp_result_file, 'r') as f:
+            experiment_results = json.load(f)
+        print(f"Loaded existing experiment results from {exp_result_file}")
+    else:
+        experiment_results = {
+            "experiment_name": exp_name,
+            "start_time": datetime.now().isoformat(),
+            "phases": {}
+        }
     
+    checkpoint_map = {}
+    
+    # Rebuild checkpoint_map from existing results
+    if retry_failed:
+        for phase_name, phase_data in experiment_results.get("phases", {}).items():
+            for item_name, item_data in phase_data.items():
+                if isinstance(item_data, dict) and "checkpoint_dir" in item_data:
+                    checkpoint_map[item_name] = item_data["checkpoint_dir"]
+                    print(f"Loaded checkpoint mapping: {item_name} -> {item_data['checkpoint_dir']}")
+
     # Execute each phase
     for phase_config in experiment_config.get("phases", []):
         phase_name = phase_config["name"]
         print(f"Starting phase: {phase_name}")
         
-        phase_results = conduct_experiment_phase(phase_config, exp_results_dir)
+        phase_results = conduct_experiment_phase(phase_config, exp_results_dir, checkpoint_map, retry_failed)
         experiment_results["phases"][phase_name] = phase_results
     
     # Save overall experiment results
@@ -340,6 +439,8 @@ def main():
                         help="Directory to save experiment results")
     parser.add_argument("--experiment", type=str, 
                         help="Specific experiment to run (if not specified, runs all experiments)")
+    parser.add_argument("--retry-failed", action="store_true",
+                        help="Only retry failed or missing experiments (skips successful ones)")
     
     args = parser.parse_args()
     
@@ -373,9 +474,11 @@ def main():
         exp_name = exp_config["name"]
         print(f"\n{'='*50}")
         print(f"RUNNING EXPERIMENT: {exp_name}")
+        if args.retry_failed:
+            print(f"MODE: Retry failed experiments only")
         print(f"{'='*50}")
         
-        exp_results = conduct_experiment(exp_config, args.results_dir)
+        exp_results = conduct_experiment(exp_config, args.results_dir, retry_failed=args.retry_failed)
         all_results[exp_name] = exp_results
     
     # Save overall results
