@@ -543,7 +543,30 @@ if __name__ == "__main__":
         f.write(f'extra_specs: {extra_specs}\n')
         f.write(f'lr: {args.lr}\n')
         f.write(f'gamma: {args.gamma}\n')
-    
+
+    # If wandb_name is provided, create a symbolic link with that name
+    if args.wandb_name:
+        import re
+        # Clean the wandb_name to be a valid directory name
+        clean_name = re.sub(r'[^\w\-_]', '_', args.wandb_name)
+        link_path = f'checkpoints/{clean_name}'
+
+        # Remove the link if it already exists
+        if os.path.islink(link_path):
+            os.unlink(link_path)
+            print(f"Removed existing symbolic link: {link_path}")
+        elif os.path.exists(link_path):
+            # If it's a directory, don't overwrite it
+            print(f"Warning: {link_path} already exists and is not a symbolic link. Skipping link creation.")
+        
+        # Create the symbolic link if path is now available
+        if not os.path.exists(link_path):
+            # Create the symbolic link - use relative path to avoid issues
+            # Get the relative path from the checkpoints directory to the save_folder
+            rel_path = os.path.relpath(save_folder, os.path.dirname(link_path))
+            os.symlink(rel_path, link_path)
+            print(f"Created symbolic link from {link_path} to {rel_path}")
+
     if args.use_wandb:
         try:
             import wandb
