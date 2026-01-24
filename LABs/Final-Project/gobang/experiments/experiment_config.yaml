@@ -20,7 +20,7 @@ experiments:
                 batch_norm: false
                 action_injection: "late"
               num_episodes: 1000
-              checkpoint_interval: 200
+              checkpoint_interval: 100
               use_wandb: true
               wandb_name: "baseline-cnn-d3-w64-late"
           - name: "deep_cnn_d5_w64"
@@ -32,7 +32,7 @@ experiments:
                 batch_norm: false
                 action_injection: "late"
               num_episodes: 1500
-              checkpoint_interval: 200
+              checkpoint_interval: 100
               use_wandb: true
               wandb_name: "deep-cnn-d5-w64-late"
       - name: "convergence_tests"
@@ -100,7 +100,7 @@ experiments:
                 batch_norm: false
                 action_injection: "late"
               num_episodes: 1000
-              checkpoint_interval: 200
+              checkpoint_interval: 100
               use_wandb: true
               wandb_name: "depth-d2-w64-late"
           - name: "depth_4_model"
@@ -112,7 +112,7 @@ experiments:
                 batch_norm: false
                 action_injection: "late"
               num_episodes: 1200
-              checkpoint_interval: 200
+              checkpoint_interval: 100
               use_wandb: true
               wandb_name: "depth-d4-w64-late"
           - name: "depth_6_model"
@@ -124,7 +124,7 @@ experiments:
                 batch_norm: false
                 action_injection: "late"
               num_episodes: 1800
-              checkpoint_interval: 200
+              checkpoint_interval: 100
               use_wandb: true
               wandb_name: "depth-d6-w64-late"
       - name: "depth_tournament"
@@ -183,7 +183,7 @@ experiments:
                 batch_norm: false
                 action_injection: "late"
               num_episodes: 1000
-              checkpoint_interval: 200
+              checkpoint_interval: 100
               use_wandb: true
               wandb_name: "width-d3-ch16-late"
           - name: "width_32_d3"
@@ -195,7 +195,7 @@ experiments:
                 batch_norm: false
                 action_injection: "late"
               num_episodes: 1000
-              checkpoint_interval: 200
+              checkpoint_interval: 100
               use_wandb: true
               wandb_name: "width-d3-ch32-late"
           - name: "width_128_d3"
@@ -207,7 +207,7 @@ experiments:
                 batch_norm: false
                 action_injection: "late"
               num_episodes: 1000
-              checkpoint_interval: 200
+              checkpoint_interval: 100
               use_wandb: true
               wandb_name: "width-d3-ch128-late"
           - name: "width_256_d3"
@@ -219,7 +219,7 @@ experiments:
                 batch_norm: false
                 action_injection: "late"
               num_episodes: 1000
-              checkpoint_interval: 200
+              checkpoint_interval: 100
               use_wandb: true
               wandb_name: "width-d3-ch256-late"
       - name: "width_training_deep"
@@ -234,7 +234,7 @@ experiments:
                 batch_norm: false
                 action_injection: "late"
               num_episodes: 1500
-              checkpoint_interval: 200
+              checkpoint_interval: 100
               use_wandb: true
               wandb_name: "width-d5-ch16-late"
           - name: "width_32_d5"
@@ -246,7 +246,7 @@ experiments:
                 batch_norm: false
                 action_injection: "late"
               num_episodes: 1500
-              checkpoint_interval: 200
+              checkpoint_interval: 100
               use_wandb: true
               wandb_name: "width-d5-ch32-late"
           - name: "width_128_d5"
@@ -258,7 +258,7 @@ experiments:
                 batch_norm: false
                 action_injection: "late"
               num_episodes: 1500
-              checkpoint_interval: 200
+              checkpoint_interval: 100
               use_wandb: true
               wandb_name: "width-d5-ch128-late"
           - name: "width_256_d5"
@@ -270,7 +270,7 @@ experiments:
                 batch_norm: false
                 action_injection: "late"
               num_episodes: 1500
-              checkpoint_interval: 200
+              checkpoint_interval: 100
               use_wandb: true
               wandb_name: "width-d5-ch256-late"
 
@@ -290,7 +290,7 @@ experiments:
                 batch_norm: true
                 action_injection: "late"
               num_episodes: 1000
-              checkpoint_interval: 200
+              checkpoint_interval: 100
               use_wandb: true
               wandb_name: "bn-d3-ch64-late"
       - name: "bn_comparison"
@@ -323,7 +323,7 @@ experiments:
                 batch_norm: false
                 action_injection: "none"
               num_episodes: 1000
-              checkpoint_interval: 200
+              checkpoint_interval: 100
               use_wandb: true
               wandb_name: "action-inject-none"
           - name: "early_injection_model"
@@ -335,7 +335,7 @@ experiments:
                 batch_norm: false
                 action_injection: "early"
               num_episodes: 1000
-              checkpoint_interval: 200
+              checkpoint_interval: 100
               use_wandb: true
               wandb_name: "action-inject-early"
           - name: "fc_injection_model"
@@ -347,7 +347,7 @@ experiments:
                 batch_norm: false
                 action_injection: "fc"
               num_episodes: 1000
-              checkpoint_interval: 200
+              checkpoint_interval: 100
               use_wandb: true
               wandb_name: "action-inject-fc"
       - name: "action_injection_tournament"
@@ -406,7 +406,7 @@ experiments:
                 batch_norm: false
                 action_injection: "late"
               num_episodes: 1000
-              checkpoint_interval: 200
+              checkpoint_interval: 100
               use_wandb: true
               wandb_name: "lr-1e-5-d3-ch64-late"
               lr: 1.0e-05
@@ -419,7 +419,7 @@ experiments:
                 batch_norm: false
                 action_injection: "late"
               num_episodes: 1000
-              checkpoint_interval: 200
+              checkpoint_interval: 100
               use_wandb: true
               wandb_name: "lr-5e-5-d3-ch64-late"
               lr: 5.0e-05
@@ -432,7 +432,7 @@ experiments:
                 batch_norm: false
                 action_injection: "late"
               num_episodes: 1000
-              checkpoint_interval: 200
+              checkpoint_interval: 100
               use_wandb: true
               wandb_name: "lr-5e-4-d3-ch64-late"
               lr: 0.0005
@@ -445,7 +445,7 @@ experiments:
                 batch_norm: false
                 action_injection: "late"
               num_episodes: 1000
-              checkpoint_interval: 200
+              checkpoint_interval: 100
               use_wandb: true
               wandb_name: "lr-1e-3-d3-ch64-late"
               lr: 0.001
@@ -466,7 +466,7 @@ experiments:
                 batch_norm: false
                 action_injection: "late"
               num_episodes: 1000
-              checkpoint_interval: 200
+              checkpoint_interval: 100
               use_wandb: true
               wandb_name: "gamma-0.9-d3-ch64-late"
               gamma: 0.9
@@ -479,7 +479,7 @@ experiments:
                 batch_norm: false
                 action_injection: "late"
               num_episodes: 1000
-              checkpoint_interval: 200
+              checkpoint_interval: 100
               use_wandb: true
               wandb_name: "gamma-0.95-d3-ch64-late"
               gamma: 0.95
@@ -492,7 +492,7 @@ experiments:
                 batch_norm: false
                 action_injection: "late"
               num_episodes: 1000
-              checkpoint_interval: 200
+              checkpoint_interval: 100
               use_wandb: true
               wandb_name: "gamma-0.99-d3-ch64-late"
               gamma: 0.99
@@ -505,7 +505,7 @@ experiments:
                 batch_norm: false
                 action_injection: "late"
               num_episodes: 1000
-              checkpoint_interval: 200
+              checkpoint_interval: 100
               use_wandb: true
               wandb_name: "gamma-0.999-d3-ch64-late"
               gamma: 0.999
