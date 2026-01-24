@@ -1,78 +1,66 @@
-# Gobang Project Structure
+# Gobang AI Experiment Framework
 
-This document describes the structure of the enhanced Gobang project with extensible evaluation capabilities.
+This document describes the new unified experiment framework for the Gobang AI project.
 
 ## Directory Structure
 
 ```
 gobang/
-├── submission.py          # Main model implementation with Actor-Critic architecture
-├── utils.py              # Utility functions and game mechanics
-├── model_loader.py       # Loading trained models for black pieces
-├── opponent_loader.py    # Loading opponent models for white pieces
-├── player.py             # Visualization of playing process
-├── evaluator.py          # Original evaluator (kept for compatibility)
-├── readme.md             # Project overview and methodology
-├── log.md                # Training logs
-├── loss_tracker.png      # Generated loss visualization
-├── checkpoints/          # Saved model checkpoints
-├── wandb/               # Weights & Biases logs
-├── wrappers/            # Wrapper classes for different player types
-│   ├── __init__.py
-│   ├── checkpoint.py    # Wrapper for loading checkpointed models
-│   └── random.py        # Wrapper for random policy
-└── tests/               # Testing and evaluation scripts
-    ├── __init__.py
-    ├── human_play.py    # Human vs AI gameplay interface
-    └── evaluator.py     # General evaluator for any pair of players
+├── submission.py          # Model implementation
+├── utils.py              # Utility functions
+├── player.py             # Interactive player
+├── tests/                # Testing and evaluation tools
+│   ├── evaluator.py      # Model evaluation framework
+│   ├── calculate_statistics.py  # Statistical analysis tools
+│   └── conduct_experiment.py    # Unified experiment conductor (NEW!)
+├── experiments/          # Experiment configurations and results
+│   ├── plan.md           # Original experimental plan (moved from log.md)
+│   ├── experiment_config.yaml  # YAML configuration for experiments (NEW!)
+│   └── results/          # Experiment results directory
+└── checkpoints/          # Trained model checkpoints
 ```
 
-## Key Components
+## New Experiment Framework
 
-### Core Files
-- **submission.py**: Implements the GobangModel with Actor-Critic architecture. Now exports both .pth (state dict) and .pkl (complete model) files.
-- **utils.py**: Contains game mechanics, training loop, and utility functions. Updated to save both .pth and .pkl checkpoint files.
-- **model_loader.py** / **opponent_loader.py**: Functions to load trained models for gameplay.
+### 1. YAML Configuration
 
-### Wrappers
-Extensible wrapper system for different player types:
+Experiments are now defined in `experiments/experiment_config.yaml` using a clear, structured format. This allows for easy modification and extension of experiments without changing code.
 
-- **BaseWrapper**: Abstract base class defining the common interface for all wrappers
-- **CheckpointWrapper**: Loads and interfaces with trained models (both .pth and .pkl formats)
-- **RandomWrapper**: Implements a random policy for baseline comparison
-- **BaselineWrapper**: Implements a simple baseline policy (e.g., alpha-beta pruning or heuristic-based)
+### 2. Unified Experiment Conductor
 
-### Tests
-Enhanced evaluation system:
+The new `tests/conduct_experiment.py` script provides a unified interface for running experiments:
 
-- **human_play.py**: Text-based interface for human vs AI gameplay (following AlphaZero_Gomoku format)
-- **evaluator.py**: General evaluator supporting any pair of player types
-
-## Extensibility
-
-The new architecture supports easy addition of new player types:
-
-1. Create a new wrapper in `wrappers/` directory
-2. Implement the required interface (get_action, get_policy methods)
-3. Use in evaluators without code changes
-
-Future additions planned:
-- `wrappers/baseline.py` for alpha-beta pruning baseline
-- `baselines/` directory for various baseline implementations
-
-## Usage Examples
-
-### Training (now saves both .pth and .pkl)
 ```bash
-python submission.py --num_episodes 1000 --checkpoint 500 --use_deep
+# Run all experiments defined in the config
+python -m tests.conduct_experiment --config experiments/experiment_config.yaml
+
+# Run a specific experiment
+python -m tests.conduct_experiment --config experiments/experiment_config.yaml --experiment baseline
+
+# Specify custom results directory
+python -m tests.conduct_experiment --config experiments/experiment_config.yaml --results-dir my_results
 ```
 
-### Evaluation between any two players
-```bash
-python -m test.evaluator --player1_path checkpoints/model_999.pkl --player1_type checkpoint --player2_type random --episodes 100
-```
+### 3. Configuration Schema
 
-### Human vs AI gameplay
-```bash
-python -m test.human_play --model_path checkpoints/final_model.pkl --ai_player 1
-```
+The YAML configuration supports:
+
+- **Model training**: Define model architectures and training parameters
+- **Evaluations**: Specify model vs model or model vs random comparisons
+- **Statistical tests**: Define statistical analyses to run on results
+- **Phased experiments**: Organize experiments in logical phases
+
+## Benefits of the New Structure
+
+1. **Maintainability**: Single tool for all experiments instead of multiple bloated scripts
+2. **Flexibility**: Easy to modify experiments via configuration without code changes
+3. **Reproducibility**: Clear, structured experiment definitions
+4. **Scalability**: Easy to add new experiments or modify existing ones
+5. **Organization**: Proper separation of concerns with dedicated directories
+
+## Migration Notes
+
+- Old scripts (`run_experiments.sh`, `rerun_evaluations.py`, `update_log_with_results.py`) have been removed
+- The original experimental plan is now at `experiments/plan.md`
+- All experiments are now conducted through the unified tool using YAML configs
+- Results are saved in the `experiments/results/` directory

@@ -1,0 +1,533 @@
+# Gobang AI Experiment Configuration Schema
+
+# This YAML file defines the experimental plan for the Gobang AI project
+# Each experiment is defined with its parameters, training steps, and evaluation criteria
+
+experiments:
+  baseline:
+    name: "Baseline Experiments"
+    description: "Train baseline CNN models with different configurations"
+    phases:
+      - name: "baseline_training"
+        description: "Train baseline CNN models with different depths"
+        models:
+          - name: "baseline_cnn_d3_w64"
+            parameters:
+              model_type: "cnn"
+              extra_specs:
+                depth: 3
+                channels: 64
+                batch_norm: false
+                action_injection: "late"
+              num_episodes: 1000
+              checkpoint_interval: 200
+              use_wandb: true
+              wandb_name: "baseline-cnn-d3-w64-late"
+          - name: "deep_cnn_d5_w64"
+            parameters:
+              model_type: "cnn"
+              extra_specs:
+                depth: 5
+                channels: 64
+                batch_norm: false
+                action_injection: "late"
+              num_episodes: 1500
+              checkpoint_interval: 200
+              use_wandb: true
+              wandb_name: "deep-cnn-d5-w64-late"
+      - name: "convergence_tests"
+        description: "Test if models have converged"
+        evaluations:
+          - name: "baseline_convergence"
+            player1: "baseline_cnn_d3_w64"
+            player1_checkpoint: "model_999.pth"
+            player2: "baseline_cnn_d3_w64"
+            player2_checkpoint: "model_799.pth"
+            episodes: 500
+            statistical_test: "binomial_test"
+            null_hypothesis: "p=0.5"
+            alternative_hypothesis: "p != 0.5"
+            significance_level: 0.01
+          - name: "deep_convergence"
+            player1: "deep_cnn_d5_w64"
+            player1_checkpoint: "model_1499.pth"
+            player2: "deep_cnn_d5_w64"
+            player2_checkpoint: "model_1299.pth"
+            episodes: 500
+            statistical_test: "binomial_test"
+            null_hypothesis: "p=0.5"
+            alternative_hypothesis: "p != 0.5"
+            significance_level: 0.01
+      - name: "performance_vs_random"
+        description: "Test if baseline CNN significantly outperforms random policy"
+        evaluations:
+          - name: "baseline_vs_random"
+            player1: "baseline_cnn_d3_w64"
+            player1_checkpoint: "model_999.pth"
+            player2: "random"
+            episodes: 500
+            statistical_test: "one_proportion_test"
+            null_hypothesis: "p=0.5"
+            alternative_hypothesis: "p > 0.5"
+            significance_level: 0.01
+      - name: "depth_comparison"
+        description: "Compare baseline and deep CNN performance"
+        evaluations:
+          - name: "depth_comparison"
+            player1: "baseline_cnn_d3_w64"
+            player1_checkpoint: "model_999.pth"
+            player2: "deep_cnn_d5_w64"
+            player2_checkpoint: "model_1499.pth"
+            episodes: 500
+            statistical_test: "two_proportion_z_test"
+            null_hypothesis: "p_baseline = p_deep"
+            alternative_hypothesis: "p_baseline != p_deep"
+            significance_level: 0.01
+
+  depth_exploration:
+    name: "Comprehensive Depth Exploration"
+    description: "Test models with different depths (2, 3, 4, 5, 6) at fixed width=64"
+    phases:
+      - name: "depth_training"
+        description: "Train models with different depths"
+        models:
+          - name: "depth_2_model"
+            parameters:
+              model_type: "cnn"
+              extra_specs:
+                depth: 2
+                channels: 64
+                batch_norm: false
+                action_injection: "late"
+              num_episodes: 1000
+              checkpoint_interval: 200
+              use_wandb: true
+              wandb_name: "depth-d2-w64-late"
+          - name: "depth_4_model"
+            parameters:
+              model_type: "cnn"
+              extra_specs:
+                depth: 4
+                channels: 64
+                batch_norm: false
+                action_injection: "late"
+              num_episodes: 1200
+              checkpoint_interval: 200
+              use_wandb: true
+              wandb_name: "depth-d4-w64-late"
+          - name: "depth_6_model"
+            parameters:
+              model_type: "cnn"
+              extra_specs:
+                depth: 6
+                channels: 64
+                batch_norm: false
+                action_injection: "late"
+              num_episodes: 1800
+              checkpoint_interval: 200
+              use_wandb: true
+              wandb_name: "depth-d6-w64-late"
+      - name: "depth_tournament"
+        description: "Compare all depth variants in round-robin tournament"
+        evaluations:
+          - name: "d2_vs_d3"
+            player1: "depth_2_model"
+            player1_checkpoint: "model_999.pth"
+            player2: "baseline_cnn_d3_w64"
+            player2_checkpoint: "model_999.pth"
+            episodes: 500
+          - name: "d3_vs_d4"
+            player1: "baseline_cnn_d3_w64"
+            player1_checkpoint: "model_999.pth"
+            player2: "depth_4_model"
+            player2_checkpoint: "model_1199.pth"
+            episodes: 500
+          - name: "d4_vs_d5"
+            player1: "depth_4_model"
+            player1_checkpoint: "model_1199.pth"
+            player2: "deep_cnn_d5_w64"
+            player2_checkpoint: "model_1499.pth"
+            episodes: 500
+          - name: "d5_vs_d6"
+            player1: "deep_cnn_d5_w64"
+            player1_checkpoint: "model_1499.pth"
+            player2: "depth_6_model"
+            player2_checkpoint: "model_1799.pth"
+            episodes: 500
+          - name: "d2_vs_d5"
+            player1: "depth_2_model"
+            player1_checkpoint: "model_999.pth"
+            player2: "deep_cnn_d5_w64"
+            player2_checkpoint: "model_1499.pth"
+            episodes: 500
+          - name: "d2_vs_d6"
+            player1: "depth_2_model"
+            player1_checkpoint: "model_999.pth"
+            player2: "depth_6_model"
+            player2_checkpoint: "model_1799.pth"
+            episodes: 500
+
+  width_exploration:
+    name: "Comprehensive Width Exploration"
+    description: "Test models with different widths (16, 32, 64, 128, 256) at various depths"
+    phases:
+      - name: "width_training_shallow"
+        description: "Train models with different widths at depth=3"
+        models:
+          - name: "width_16_d3"
+            parameters:
+              model_type: "cnn"
+              extra_specs:
+                depth: 3
+                channels: 16
+                batch_norm: false
+                action_injection: "late"
+              num_episodes: 1000
+              checkpoint_interval: 200
+              use_wandb: true
+              wandb_name: "width-d3-ch16-late"
+          - name: "width_32_d3"
+            parameters:
+              model_type: "cnn"
+              extra_specs:
+                depth: 3
+                channels: 32
+                batch_norm: false
+                action_injection: "late"
+              num_episodes: 1000
+              checkpoint_interval: 200
+              use_wandb: true
+              wandb_name: "width-d3-ch32-late"
+          - name: "width_128_d3"
+            parameters:
+              model_type: "cnn"
+              extra_specs:
+                depth: 3
+                channels: 128
+                batch_norm: false
+                action_injection: "late"
+              num_episodes: 1000
+              checkpoint_interval: 200
+              use_wandb: true
+              wandb_name: "width-d3-ch128-late"
+          - name: "width_256_d3"
+            parameters:
+              model_type: "cnn"
+              extra_specs:
+                depth: 3
+                channels: 256
+                batch_norm: false
+                action_injection: "late"
+              num_episodes: 1000
+              checkpoint_interval: 200
+              use_wandb: true
+              wandb_name: "width-d3-ch256-late"
+      - name: "width_training_deep"
+        description: "Train models with different widths at depth=5"
+        models:
+          - name: "width_16_d5"
+            parameters:
+              model_type: "cnn"
+              extra_specs:
+                depth: 5
+                channels: 16
+                batch_norm: false
+                action_injection: "late"
+              num_episodes: 1500
+              checkpoint_interval: 200
+              use_wandb: true
+              wandb_name: "width-d5-ch16-late"
+          - name: "width_32_d5"
+            parameters:
+              model_type: "cnn"
+              extra_specs:
+                depth: 5
+                channels: 32
+                batch_norm: false
+                action_injection: "late"
+              num_episodes: 1500
+              checkpoint_interval: 200
+              use_wandb: true
+              wandb_name: "width-d5-ch32-late"
+          - name: "width_128_d5"
+            parameters:
+              model_type: "cnn"
+              extra_specs:
+                depth: 5
+                channels: 128
+                batch_norm: false
+                action_injection: "late"
+              num_episodes: 1500
+              checkpoint_interval: 200
+              use_wandb: true
+              wandb_name: "width-d5-ch128-late"
+          - name: "width_256_d5"
+            parameters:
+              model_type: "cnn"
+              extra_specs:
+                depth: 5
+                channels: 256
+                batch_norm: false
+                action_injection: "late"
+              num_episodes: 1500
+              checkpoint_interval: 200
+              use_wandb: true
+              wandb_name: "width-d5-ch256-late"
+
+  batch_normalization:
+    name: "Batch Normalization Effects"
+    description: "Test effect of batch normalization on convergence and performance"
+    phases:
+      - name: "bn_training"
+        description: "Train model with batch normalization"
+        models:
+          - name: "bn_model"
+            parameters:
+              model_type: "cnn"
+              extra_specs:
+                depth: 3
+                channels: 64
+                batch_norm: true
+                action_injection: "late"
+              num_episodes: 1000
+              checkpoint_interval: 200
+              use_wandb: true
+              wandb_name: "bn-d3-ch64-late"
+      - name: "bn_comparison"
+        description: "Compare batch norm vs no batch norm"
+        evaluations:
+          - name: "bn_vs_no_bn"
+            player1: "bn_model"
+            player1_checkpoint: "model_999.pth"
+            player2: "baseline_cnn_d3_w64"
+            player2_checkpoint: "model_999.pth"
+            episodes: 500
+            statistical_test: "two_proportion_z_test"
+            null_hypothesis: "p_bn = p_no-bn"
+            alternative_hypothesis: "p_bn != p_no-bn"
+            significance_level: 0.01
+
+  action_injection:
+    name: "Action Injection Methods"
+    description: "Test different action injection strategies in the Critic"
+    phases:
+      - name: "action_injection_training"
+        description: "Train models with different action injection methods"
+        models:
+          - name: "no_injection_model"
+            parameters:
+              model_type: "cnn"
+              extra_specs:
+                depth: 3
+                channels: 64
+                batch_norm: false
+                action_injection: "none"
+              num_episodes: 1000
+              checkpoint_interval: 200
+              use_wandb: true
+              wandb_name: "action-inject-none"
+          - name: "early_injection_model"
+            parameters:
+              model_type: "cnn"
+              extra_specs:
+                depth: 3
+                channels: 64
+                batch_norm: false
+                action_injection: "early"
+              num_episodes: 1000
+              checkpoint_interval: 200
+              use_wandb: true
+              wandb_name: "action-inject-early"
+          - name: "fc_injection_model"
+            parameters:
+              model_type: "cnn"
+              extra_specs:
+                depth: 3
+                channels: 64
+                batch_norm: false
+                action_injection: "fc"
+              num_episodes: 1000
+              checkpoint_interval: 200
+              use_wandb: true
+              wandb_name: "action-inject-fc"
+      - name: "action_injection_tournament"
+        description: "Compare all action injection methods"
+        evaluations:
+          - name: "none_vs_early"
+            player1: "no_injection_model"
+            player1_checkpoint: "model_999.pth"
+            player2: "early_injection_model"
+            player2_checkpoint: "model_999.pth"
+            episodes: 500
+          - name: "none_vs_late"
+            player1: "no_injection_model"
+            player1_checkpoint: "model_999.pth"
+            player2: "baseline_cnn_d3_w64"
+            player2_checkpoint: "model_999.pth"
+            episodes: 500
+          - name: "none_vs_fc"
+            player1: "no_injection_model"
+            player1_checkpoint: "model_999.pth"
+            player2: "fc_injection_model"
+            player2_checkpoint: "model_999.pth"
+            episodes: 500
+          - name: "early_vs_late"
+            player1: "early_injection_model"
+            player1_checkpoint: "model_999.pth"
+            player2: "baseline_cnn_d3_w64"
+            player2_checkpoint: "model_999.pth"
+            episodes: 500
+          - name: "early_vs_fc"
+            player1: "early_injection_model"
+            player1_checkpoint: "model_999.pth"
+            player2: "fc_injection_model"
+            player2_checkpoint: "model_999.pth"
+            episodes: 500
+          - name: "late_vs_fc"
+            player1: "baseline_cnn_d3_w64"
+            player1_checkpoint: "model_999.pth"
+            player2: "fc_injection_model"
+            player2_checkpoint: "model_999.pth"
+            episodes: 500
+
+  learning_rate:
+    name: "Learning Rate Exploration"
+    description: "Test models with different learning rates"
+    phases:
+      - name: "lr_training"
+        description: "Train models with different learning rates"
+        models:
+          - name: "lr_1e5_model"
+            parameters:
+              model_type: "cnn"
+              extra_specs:
+                depth: 3
+                channels: 64
+                batch_norm: false
+                action_injection: "late"
+              num_episodes: 1000
+              checkpoint_interval: 200
+              use_wandb: true
+              wandb_name: "lr-1e-5-d3-ch64-late"
+              lr: 1.0e-05
+          - name: "lr_5e5_model"
+            parameters:
+              model_type: "cnn"
+              extra_specs:
+                depth: 3
+                channels: 64
+                batch_norm: false
+                action_injection: "late"
+              num_episodes: 1000
+              checkpoint_interval: 200
+              use_wandb: true
+              wandb_name: "lr-5e-5-d3-ch64-late"
+              lr: 5.0e-05
+          - name: "lr_5e4_model"
+            parameters:
+              model_type: "cnn"
+              extra_specs:
+                depth: 3
+                channels: 64
+                batch_norm: false
+                action_injection: "late"
+              num_episodes: 1000
+              checkpoint_interval: 200
+              use_wandb: true
+              wandb_name: "lr-5e-4-d3-ch64-late"
+              lr: 0.0005
+          - name: "lr_1e3_model"
+            parameters:
+              model_type: "cnn"
+              extra_specs:
+                depth: 3
+                channels: 64
+                batch_norm: false
+                action_injection: "late"
+              num_episodes: 1000
+              checkpoint_interval: 200
+              use_wandb: true
+              wandb_name: "lr-1e-3-d3-ch64-late"
+              lr: 0.001
+
+  discount_factor:
+    name: "Discount Factor Exploration"
+    description: "Test models with different discount factors"
+    phases:
+      - name: "gamma_training"
+        description: "Train models with different discount factors"
+        models:
+          - name: "gamma_09_model"
+            parameters:
+              model_type: "cnn"
+              extra_specs:
+                depth: 3
+                channels: 64
+                batch_norm: false
+                action_injection: "late"
+              num_episodes: 1000
+              checkpoint_interval: 200
+              use_wandb: true
+              wandb_name: "gamma-0.9-d3-ch64-late"
+              gamma: 0.9
+          - name: "gamma_095_model"
+            parameters:
+              model_type: "cnn"
+              extra_specs:
+                depth: 3
+                channels: 64
+                batch_norm: false
+                action_injection: "late"
+              num_episodes: 1000
+              checkpoint_interval: 200
+              use_wandb: true
+              wandb_name: "gamma-0.95-d3-ch64-late"
+              gamma: 0.95
+          - name: "gamma_099_model"
+            parameters:
+              model_type: "cnn"
+              extra_specs:
+                depth: 3
+                channels: 64
+                batch_norm: false
+                action_injection: "late"
+              num_episodes: 1000
+              checkpoint_interval: 200
+              use_wandb: true
+              wandb_name: "gamma-0.99-d3-ch64-late"
+              gamma: 0.99
+          - name: "gamma_0999_model"
+            parameters:
+              model_type: "cnn"
+              extra_specs:
+                depth: 3
+                channels: 64
+                batch_norm: false
+                action_injection: "late"
+              num_episodes: 1000
+              checkpoint_interval: 200
+              use_wandb: true
+              wandb_name: "gamma-0.999-d3-ch64-late"
+              gamma: 0.999
+
+  final_tournament:
+    name: "Final Tournament"
+    description: "Select top-performing models and run final tournament"
+    phases:
+      - name: "grand_tournament"
+        description: "Run round-robin tournament with top models"
+        evaluations:
+          - name: "top_models_tournament"
+            tournament_type: "round_robin"
+            participants:
+              - model: "width_128_d5"
+                checkpoint: "model_1499.pth"
+              - model: "deep_cnn_d5_w64"
+                checkpoint: "model_1499.pth"
+              - model: "gamma_099_model"
+                checkpoint: "model_999.pth"
+              - model: "lr_5e4_model"
+                checkpoint: "model_999.pth"
+              - model: "baseline_cnn_d3_w64"
+                checkpoint: "model_999.pth"
+            episodes_per_match: 500

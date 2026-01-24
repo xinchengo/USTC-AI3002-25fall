@@ -71,9 +71,8 @@ def create_wrapper(wrapper_type, **kwargs):
                 extra_specs=extra_specs
             )
         else:
-            # If model path not provided or doesn't exist, fall back to baseline
-            print(f"Model path not provided or doesn't exist for {wrapper_type}, falling back to baseline")
-            return BaselineWrapper(board_size=board_size, bound=bound)
+            # Raise error if model path is invalid
+            raise FileNotFoundError(f"Model path '{model_path}' does not exist for checkpoint wrapper.")
 
     elif wrapper_type == 'random':
         board_size = kwargs.get('board_size', 12)

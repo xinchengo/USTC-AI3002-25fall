@@ -23,3 +23,20 @@ The main modifications we're considering revolve around addressing two key chall
 ## Conclusion
 
 Our experiment presents a comprehensive exploration towards developing a Gobang agent adept at navigating larger boards through the integration of deep learning techniques and reinforcement learning principles. While our efforts have been focused on addressing challenges such as legality constraints and efficient response generation, we acknowledge the possibility of shortcomings and limitations within the algorithm. There remains room for improvement and alternative approaches that could further enhance the bot's performance and adaptability. We aspire to foster an environment of continuous learning and evolution, recognizing that the pursuit of excellence is an ongoing journey.
+
+## Running Experiments
+
+To run the experiments defined in the configuration:
+
+1. Activate the environment: `source .venv/bin/activate`
+2. Use the unified experiment conductor:
+   ```bash
+   # Run all experiments defined in the config
+   python -m tests.conduct_experiment --config experiments/experiment_config.yaml
+
+   # Run a specific experiment
+   python -m tests.conduct_experiment --config experiments/experiment_config.yaml --experiment baseline
+
+   # Specify custom results directory
+   python -m tests.conduct_experiment --config experiments/experiment_config.yaml --results-dir my_results
+   ```
