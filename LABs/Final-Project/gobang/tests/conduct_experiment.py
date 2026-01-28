@@ -57,6 +57,8 @@ def run_training(model_params, checkpoint_dir):
         cmd.extend(["--lr", str(model_params["lr"])])
     if "gamma" in model_params:
         cmd.extend(["--gamma", str(model_params["gamma"])])
+    if "reward_type" in model_params:
+        cmd.extend(["--reward-type", str(model_params["reward_type"])])
     
     # Create checkpoint directory
     os.makedirs(checkpoint_dir, exist_ok=True)

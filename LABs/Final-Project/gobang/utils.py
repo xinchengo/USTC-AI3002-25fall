@@ -173,13 +173,89 @@ class UtilGobang:
             f"The evaluated winning probability for the black pieces is "
             f"{black_wins / (black_wins + white_wins + ties)}."
         )
+    
+    def evaluate_board(self, board, color):
+        """
+        评估函数：基于棋型给予分数，而非简单的连珠长度。
+        参考了传统五子棋 AI 的启发式评分。
+        """
+        score = 0
+        # 定义棋型分数
+        SCORE_FIVE = 100000
+        SCORE_LIVE_FOUR = 10000
+        SCORE_DEAD_FOUR = 1000
+        SCORE_LIVE_THREE = 1000
+        SCORE_DEAD_THREE = 100
+        SCORE_LIVE_TWO = 100
+        SCORE_DEAD_TWO = 10
+        
+        # 获取所有行、列、对角线
+        lines = []
+        # 横向
+        for r in range(self.board_size):
+            lines.append(board[r, :])
+        # 纵向
+        for c in range(self.board_size):
+            lines.append(board[:, c])
+        # 对角线
+        directions = [(1, 0), (0, 1), (1, 1), (1, -1)]
+        visited = set()
+
+        for r in range(self.board_size):
+            for c in range(self.board_size):
+                if board[r][c] != color:
+                    continue
+                
+                for dr, dc in directions:
+                    if (r, c, dr, dc) in visited:
+                        continue
+                    
+                    prev_r, prev_c = r - dr, c - dc
+                    if self.judge_legal_position(prev_r, prev_c) and board[prev_r][prev_c] == color:
+                        continue
+                    
+                    count = 0
+                    curr_r, curr_c = r, c
+                    while self.judge_legal_position(curr_r, curr_c) and board[curr_r][curr_c] == color:
+                        visited.add((curr_r, curr_c, dr, dc))
+                        count += 1
+                        curr_r += dr
+                        curr_c += dc
+                    
+                    blocked_head = False
+                    if not self.judge_legal_position(prev_r, prev_c) or board[prev_r][prev_c] != 0:
+                        blocked_head = True
+                        
+                    blocked_tail = False
+                    if not self.judge_legal_position(curr_r, curr_c) or board[curr_r][curr_c] != 0:
+                        blocked_tail = True
+                    
+                    if count >= 5:
+                        score += SCORE_FIVE
+                    elif count == 4:
+                        if not blocked_head and not blocked_tail: # 活四
+                            score += SCORE_LIVE_FOUR
+                        elif not (blocked_head and blocked_tail): # 冲四 (死四)
+                            score += SCORE_DEAD_FOUR
+                    elif count == 3:
+                        if not blocked_head and not blocked_tail: # 活三
+                            score += SCORE_LIVE_THREE
+                        elif not (blocked_head and blocked_tail): # 眠三
+                            score += SCORE_DEAD_THREE
+                    elif count == 2:
+                        if not blocked_head and not blocked_tail: # 活二
+                            score += SCORE_LIVE_TWO
+                        elif not (blocked_head and blocked_tail): # 眠二
+                            score += SCORE_DEAD_TWO
+        return score
 
 
 class Gobang(UtilGobang):
 
-    def __init__(self, board_size, bound, training):
+    def __init__(self, board_size, bound, training, reward_type='default'):
         super().__init__(board_size=board_size, bound=bound)
         self.training = training
+        self.reward_type = reward_type
         self.model, self.opponent = None, None
 
     def get_next_state(self, action: Tuple[int, int, int], response: Tuple[int, int, int]) -> np.array:
@@ -210,11 +286,42 @@ class Gobang(UtilGobang):
 
     def get_connection_and_reward(self, action: Tuple[int, int, int],
                                   response: Tuple[int, int, int]) -> Tuple[int, int, int, int, float]:
-        next_state = self.get_next_state(action, response)
-        black_1, white_1 = self.count_max_connections(self.board)
-        black_2, white_2 = self.count_max_connections(next_state)
-        reward = (black_2 ** 2 - white_2 ** 2) - (black_1 ** 2 - white_1 ** 2)
-        return black_1, white_1, black_2, white_2, reward
+        
+        
+        # Calculate reward based on reward_type
+        if self.reward_type == 'default':
+            next_state = self.get_next_state(action, response)
+            black_1, white_1 = self.count_max_connections(self.board)
+            black_2, white_2 = self.count_max_connections(next_state)
+            reward = (black_2 ** 2 - white_2 ** 2) - (black_1 ** 2 - white_1 ** 2)
+            return black_1, white_1, black_2, white_2, reward
+        
+        elif self.reward_type == 'heuristic':
+            score_black_1 = self.evaluate_board(self.board, 1)
+            score_white_1 = self.evaluate_board(self.board, 2)
+            next_state = self.get_next_state(action, response)
+            score_black_2 = self.evaluate_board(next_state, 1)
+            score_white_2 = self.evaluate_board(next_state, 2)
+            
+            # Reward    
+            scale = 100.0
+            
+            diff_black = (score_black_2 - score_black_1) / scale
+            diff_white = (score_white_2 - score_white_1) / scale
+            
+            reward = diff_black - 0.8 * diff_white
+            
+            # 如果这一步直接赢了，给予巨大额外奖励
+            if score_black_2 >= 100000: 
+                reward += 100.0
+
+            b1, w1 = self.count_max_connections(self.board)
+            b2, w2 = self.count_max_connections(next_state)
+            
+            return b1, w1, b2, w2, reward
+        
+        else:
+            raise ValueError(f"Unknown reward_type: {self.reward_type}")
 
     def sample_action_and_response(self, random_response) -> Tuple[Tuple[int, int, int], Tuple[int, int, int]]:
         state = self.board
@@ -293,8 +400,8 @@ def _get_next_state(state, action, response):
     return next_state
 
 
-def train_model(model, num_episodes=1000, checkpoint=1000, gamma=0.5, save_dir="checkpoints"): #用于保存 Deep 模型
-    chess_board = Gobang(board_size=model.board_size, bound=model.bound, training=True)
+def train_model(model, num_episodes=1000, checkpoint=1000, gamma=0.5, save_dir="checkpoints", reward_type='default'):
+    chess_board = Gobang(board_size=model.board_size, bound=model.bound, training=True, reward_type=reward_type)
     actor_records, critic_records, entropy_records = [], [], []
     for _ in range(num_episodes):
         states, actions, rewards, next_states = [[] for _ in range(4)]

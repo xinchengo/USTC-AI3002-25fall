@@ -7,7 +7,24 @@ from typing import *
 import sys
 import argparse
 import json
+import math
 
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, max_len=500):
+        super(PositionalEncoding, self).__init__()
+        # 创建一个足够长的 PE 矩阵
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        # x shape: (Batch, Seq_Len, Dim)
+        # 添加位置编码到输入上
+        x = x + self.pe[:x.size(1), :]
+        return x
 
 class Actor(nn.Module):
     """
@@ -59,6 +76,11 @@ class Actor(nn.Module):
         """
 
         # BEGIN YOUR CODE
+        # Attention/Transformer 参数
+        embed_dim = self.extra_specs.get('embed_dim', 64)
+        num_heads = self.extra_specs.get('num_heads', 4)
+        num_layers = self.extra_specs.get('num_layers', 2)
+
         if model_type == "default":
             if not use_deep:
                 # Architecture 1: Baseline CNN (3-Layer)
@@ -110,6 +132,34 @@ class Actor(nn.Module):
             self.conv_blocks = nn.Sequential(*layers)
             flat_features = channels * board_size * board_size
             self.fc = nn.Linear(flat_features, board_size * board_size)
+        elif model_type == "attention":
+            # 混合架构：CNN 提取局部特征 -> Self-Attention 整合全局特征
+            # 浅层 CNN 提取 Token 特征
+            self.feature_extractor = nn.Sequential(
+                nn.Conv2d(1, 32, kernel_size=3, padding=1), nn.ReLU(),
+                nn.Conv2d(32, embed_dim, kernel_size=3, padding=1), nn.ReLU()
+            )
+            # 位置编码
+            self.pos_encoder = PositionalEncoding(embed_dim, max_len=board_size*board_size)
+            # Multi-Head Attention 层
+            self.attention = nn.MultiheadAttention(embed_dim=embed_dim, num_heads=num_heads, batch_first=True)
+            self.norm = nn.LayerNorm(embed_dim)
+            # 输出头
+            self.output_head = nn.Linear(embed_dim, 1)
+        elif model_type == "transformer":
+            # 纯 Transformer 架构
+            # Input Embedding
+            self.embedding = nn.Sequential(
+                nn.Conv2d(1, embed_dim, kernel_size=3, padding=1),
+                nn.ReLU()
+            )
+            # 位置编码
+            self.pos_encoder = PositionalEncoding(embed_dim, max_len=board_size*board_size)
+            # Transformer Encoder Stack
+            encoder_layer = nn.TransformerEncoderLayer(d_model=embed_dim, nhead=num_heads, batch_first=True)
+            self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+            # 输出头
+            self.output_head = nn.Linear(embed_dim, 1)
         else:
             raise NotImplementedError("Model type not implemented.")
 
@@ -152,34 +202,49 @@ class Actor(nn.Module):
         # ****************************************
 
         # BEGIN YOUR CODE
-        if isinstance(x, np.ndarray):
-            x = torch.tensor(x).to(device).float()
-        else:
-            x = x.to(device).float()
-        if x.dim() == 2: output = x.unsqueeze(0).unsqueeze(0)
-        elif x.dim() == 3: output = x.unsqueeze(0)
-        else: output = x
-        
-        # 1. 网络前向传播：通过卷积层提取特征
-        out = self.conv_blocks(output)
-        
-        # 2. 展平张量：从 (B, Channels, N, N) 变为 (B, Channels*N*N)
-        out = out.view(out.size(0), -1)
-        
-        # 3. 全连接层：得到每个位置的原始评分
-        # 形状变为 (B, N^2)
-        logits = self.fc(out)
+        input_board = output.clone()
+        batch_size = output.size(0)
 
-        # 4. 合法动作掩码
-        # 输入 output 是 (B, 1, N, N)，展平对应 logits 的 (B, N^2)
-        flat_board = output.view(output.size(0), -1)
-        
-        # 创建掩码
+        logits = None
+
+        if self.model_type in ["default", "cnn"]:
+            # CNN 逻辑
+            out = self.conv_blocks(output)
+            out = out.view(out.size(0), -1)
+            logits = self.fc(out)
+
+        elif self.model_type == "attention":
+            # CNN 提取特征
+            features = self.feature_extractor(output)
+            # 展平为序列
+            # N*N = 144
+            features = features.view(batch_size, features.size(1), -1).permute(0, 2, 1)
+            features = self.pos_encoder(features)
+            # Self-Attention
+            attn_output, _ = self.attention(features, features, features)
+            # Residual + Norm
+            features = self.norm(features + attn_output)
+            # 输出头
+            logits = self.output_head(features)
+            # Squeeze
+            logits = logits.squeeze(-1)
+
+        elif self.model_type == "transformer":
+            # Embedding: (B, 1, N, N) -> (B, Embed, N, N)
+            features = self.embedding(output)
+            # Flatten
+            features = features.view(batch_size, features.size(1), -1).permute(0, 2, 1)
+            # Positional Encoding
+            features = self.pos_encoder(features)
+            # Transformer Encoder
+            features = self.transformer_encoder(features)
+            # Output Head -> (B, N*N)
+            logits = self.output_head(features).squeeze(-1)
+
+        # Masking & Softmax (所有模型通用)
+        flat_board = input_board.view(batch_size, -1)
         illegal_mask = (flat_board != 0)
-        # 注：使用 logits[mask] = -inf 会破坏梯度计算
         logits = logits.masked_fill(illegal_mask, -1e9)
-
-        # 5. 归一化
         output = torch.softmax(logits, dim=1)
         # END YOUR CODE
         return output
@@ -259,7 +324,7 @@ class Critic(nn.Module):
             else:
                 self.fc = nn.Linear(flat_features, board_size * board_size)
                 
-        elif model_type == "cnn":
+        elif model_type in ["cnn", "attention", "transformer"]:
             # Get architecture specs
             depth = self.extra_specs.get('depth', 3)
             channels = self.extra_specs.get('channels', 64)  # Changed default from 32 to 64
@@ -458,6 +523,8 @@ if __name__ == "__main__":
     parser.add_argument('--checkpoint', type=int, help='the interval of saving models')
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate for optimizers (default: 1e-4)')
     parser.add_argument('--gamma', type=float, default=0.5, help='discount factor for training (default: 0.5)')
+    parser.add_argument('--reward-type', type=str, default='default', dest='reward_type', 
+                        help='reward type: default, heuristic (default: default)')
     parser.add_argument('--use_wandb', action='store_true', help='use wandb for experiment tracking (requires wandb installed)')
     parser.add_argument('--wandb_project', type=str, default='gobang-rl-AI3002', help='wandb project name')
     parser.add_argument('--wandb_name', type=str, default=None, help='wandb run name')
@@ -494,6 +561,7 @@ if __name__ == "__main__":
                     "bound": 5,
                     "lr": args.lr,
                     "gamma": args.gamma,
+                    "reward_type": args.reward_type,
                 }
             )
             print("Wandb initialized successfully.")
@@ -522,7 +590,7 @@ if __name__ == "__main__":
     print(f"Models will be saved to: {save_folder}")
     os.makedirs(save_folder, exist_ok=True)
     # 传递 save_dir 给 train_model
-    train_model(agent, num_episodes=num_episodes, checkpoint=checkpoint, gamma=args.gamma, save_dir=save_folder)
+    train_model(agent, num_episodes=num_episodes, checkpoint=checkpoint, gamma=args.gamma, save_dir=save_folder, reward_type=args.reward_type)
 
     import pickle
     # 保存 最终模型
@@ -543,6 +611,7 @@ if __name__ == "__main__":
         f.write(f'extra_specs: {extra_specs}\n')
         f.write(f'lr: {args.lr}\n')
         f.write(f'gamma: {args.gamma}\n')
+        f.write(f'reward_type: {args.reward_type}\n')
 
     # If wandb_name is provided, create a symbolic link with that name
     if args.wandb_name:
