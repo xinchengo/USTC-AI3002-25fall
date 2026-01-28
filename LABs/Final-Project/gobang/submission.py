@@ -26,6 +26,63 @@ class PositionalEncoding(nn.Module):
         x = x + self.pe[:x.size(1), :]
         return x
 
+class Backbone(nn.Module):
+    """
+    Backbone network when use_backbone is set as true (default: false).
+
+    support only CNN type and transformer type for now.
+    """
+
+    def __init__(self, board_size: int, model_type: str = "cnn", extra_specs: dict = None):
+        super().__init__()
+        self.board_size = board_size
+        self.model_type = model_type
+        self.extra_specs = extra_specs or {}
+
+        # Shared specs for transformer
+        embed_dim = self.extra_specs.get('embed_dim', 64)
+        num_heads = self.extra_specs.get('num_heads', 4)
+        num_layers = self.extra_specs.get('num_layers', 2)
+
+        if model_type == "cnn":
+            depth = self.extra_specs.get('depth', 4)
+            channels = self.extra_specs.get('channels', 64)
+            use_batch_norm = self.extra_specs.get('batch_norm', False)
+
+            layers = []
+            in_channels = 1
+
+            for _ in range(depth):
+                layers.append(nn.Conv2d(in_channels, channels, kernel_size=3, padding=1))
+                if use_batch_norm:
+                    layers.append(nn.BatchNorm2d(channels))
+                layers.append(nn.ReLU())
+                in_channels = channels
+
+            self.conv_blocks = nn.Sequential(*layers)
+            self.out_channels = channels
+        elif model_type == "transformer":
+            self.embedding = nn.Sequential(
+                nn.Conv2d(1, embed_dim, kernel_size=3, padding=1),
+                nn.ReLU()
+            )
+            self.pos_encoder = PositionalEncoding(embed_dim, max_len=board_size * board_size)
+            encoder_layer = nn.TransformerEncoderLayer(d_model=embed_dim, nhead=num_heads, batch_first=True)
+            self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+            self.embed_dim = embed_dim
+        else:
+            raise NotImplementedError("Backbone only supports 'cnn' and 'transformer'.")
+
+    def forward(self, x: torch.Tensor):
+        if self.model_type == "cnn":
+            return self.conv_blocks(x)
+        if self.model_type == "transformer":
+            features = self.embedding(x)
+            features = features.view(features.size(0), features.size(1), -1).permute(0, 2, 1)
+            features = self.pos_encoder(features)
+            return self.transformer_encoder(features)
+        raise NotImplementedError("Backbone only supports 'cnn' and 'transformer'.")
+
 class Actor(nn.Module):
     """
     The actor is responsible for generating dependable policies to maximize the cumulative reward as much as possible.
@@ -33,11 +90,12 @@ class Actor(nn.Module):
     as the generated policy.
     """
 
-    def __init__(self, board_size: int, lr=1e-4, model_type: str = "default", extra_specs: dict = None):
+    def __init__(self, board_size: int, lr=1e-4, model_type: str = "default", extra_specs: dict = None, backbone: Optional[Backbone] = None):
         super().__init__()
         self.board_size = board_size
         self.model_type = model_type
         self.extra_specs = extra_specs or {}
+        self.backbone = backbone
 
         # Default values for backward compatibility
         use_deep = self.extra_specs.get('use_deep', False)
@@ -81,7 +139,15 @@ class Actor(nn.Module):
         num_heads = self.extra_specs.get('num_heads', 4)
         num_layers = self.extra_specs.get('num_layers', 2)
 
-        if model_type == "default":
+        if self.backbone is not None:
+            if model_type == "cnn":
+                flat_features = self.backbone.out_channels * board_size * board_size
+                self.fc = nn.Linear(flat_features, board_size * board_size)
+            elif model_type == "transformer":
+                self.output_head = nn.Linear(self.backbone.embed_dim, 1)
+            else:
+                raise NotImplementedError("Backbone Actor only supports 'cnn' and 'transformer'.")
+        elif model_type == "default":
             if not use_deep:
                 # Architecture 1: Baseline CNN (3-Layer)
                 self.conv_blocks = nn.Sequential(
@@ -209,7 +275,17 @@ class Actor(nn.Module):
 
         logits = None
 
-        if self.model_type in ["default", "cnn"]:
+        if self.backbone is not None:
+            if self.model_type == "cnn":
+                features = self.backbone(output)
+                features = features.view(features.size(0), -1)
+                logits = self.fc(features)
+            elif self.model_type == "transformer":
+                features = self.backbone(output)
+                logits = self.output_head(features).squeeze(-1)
+            else:
+                raise NotImplementedError("Backbone Actor only supports 'cnn' and 'transformer'.")
+        elif self.model_type in ["default", "cnn"]:
             # CNN 逻辑
             out = self.conv_blocks(output)
             out = out.view(out.size(0), -1)
@@ -273,12 +349,13 @@ class Critic(nn.Module):
     Finally, it returns a tensor of shape (B,) containing these Q-values.
     """
 
-    def __init__(self, board_size: int, lr=1e-4, model_type: str = "default", action_injection: str = "none", extra_specs: dict = None):
+    def __init__(self, board_size: int, lr=1e-4, model_type: str = "default", action_injection: str = "none", extra_specs: dict = None, backbone: Optional[Backbone] = None):
         super().__init__()
         self.board_size = board_size
         self.model_type = model_type
         self.action_injection = action_injection
         self.extra_specs = extra_specs or {}
+        self.backbone = backbone
         
         # Define your NN structures here as the same. Torch modules have to be registered during the initialization
         # process.
@@ -295,7 +372,26 @@ class Critic(nn.Module):
         num_heads = self.extra_specs.get('num_heads', 4)
         num_layers = self.extra_specs.get('num_layers', 2)
 
-        if model_type == "default":
+        if self.backbone is not None:
+            if model_type == "cnn":
+                flat_features = self.backbone.out_channels * board_size * board_size
+                if action_injection == "late":
+                    self.late_proj = nn.Conv2d(self.backbone.out_channels + 1, self.backbone.out_channels, kernel_size=1)
+                else:
+                    self.late_proj = None
+                if action_injection == "fc":
+                    self.fc = nn.Linear(flat_features + 2, board_size * board_size)
+                else:
+                    self.fc = nn.Linear(flat_features, board_size * board_size)
+            elif model_type == "transformer":
+                self.late_proj = None
+                if action_injection == "late":
+                    self.late_proj = nn.Linear(self.backbone.embed_dim + 1, self.backbone.embed_dim)
+                head_in_dim = self.backbone.embed_dim + (2 if action_injection == "fc" else 0)
+                self.output_head = nn.Linear(head_in_dim, 1)
+            else:
+                raise NotImplementedError("Backbone Critic only supports 'cnn' and 'transformer'.")
+        elif model_type == "default":
             use_deep = self.extra_specs.get('use_deep', False)
             
             if not use_deep:
@@ -430,7 +526,7 @@ class Critic(nn.Module):
                 action_mask[i, 0, int(ax), int(ay)] = 1.0
             # Concatenate board and action mask
             output = torch.cat([output, action_mask], dim=1)  # (B, 2, N, N)
-            if self.model_type in ["default", "cnn"]:
+            if self.model_type in ["default", "cnn"] and self.backbone is None:
                 out = self.conv_blocks(output)
             else:
                 out = output
@@ -440,7 +536,7 @@ class Critic(nn.Module):
             # Process through all but last conv layer
             # Count the number of layers: each conv block has [Conv2d, (BatchNorm2d), ReLU]
             # We want to inject before the final conv layer
-            if self.model_type in ["default", "cnn"]:
+            if self.model_type in ["default", "cnn"] and self.backbone is None:
                 layers_list = list(self.conv_blocks)
                 # Find the last Conv2d layer
                 last_conv_idx = -1
@@ -469,12 +565,41 @@ class Critic(nn.Module):
         
         # FC injection or no injection
         else:
-            if self.model_type in ["default", "cnn"]:
+            if self.model_type in ["default", "cnn"] and self.backbone is None:
                 out = self.conv_blocks(output)
             else:
                 out = output
         
-        if self.model_type in ["default", "cnn"]:
+        if self.backbone is not None:
+            if self.model_type == "cnn":
+                features = self.backbone(out)
+                if self.action_injection == "late":
+                    action_mask = torch.zeros(batch_size, 1, self.board_size, self.board_size).to(device)
+                    for i, (ax, ay) in enumerate(action_tensor):
+                        action_mask[i, 0, int(ax), int(ay)] = 1.0
+                    features = torch.cat([features, action_mask], dim=1)
+                    features = self.late_proj(features)
+                flat = features.view(features.size(0), -1)
+                if self.action_injection == "fc":
+                    action_coords = action_tensor / self.board_size
+                    flat = torch.cat([flat, action_coords], dim=1)
+                q_values_all = self.fc(flat)
+            elif self.model_type == "transformer":
+                features = self.backbone(out)
+                if self.action_injection == "late":
+                    action_mask = torch.zeros(batch_size, features.size(1), 1).to(device)
+                    for i, (ax, ay) in enumerate(action_tensor):
+                        idx = _position_to_index(self.board_size, int(ax), int(ay))
+                        action_mask[i, idx, 0] = 1.0
+                    features = torch.cat([features, action_mask], dim=-1)
+                    features = self.late_proj(features)
+                if self.action_injection == "fc":
+                    action_coords = (action_tensor / self.board_size).unsqueeze(1).expand(-1, features.size(1), -1)
+                    features = torch.cat([features, action_coords], dim=-1)
+                q_values_all = self.output_head(features).squeeze(-1)
+            else:
+                raise NotImplementedError("Backbone Critic only supports 'cnn' and 'transformer'.")
+        elif self.model_type in ["default", "cnn"]:
             # Flatten features
             out = out.view(out.size(0), -1)
 
@@ -540,6 +665,8 @@ class GobangModel(nn.Module):
         super().__init__()
         self.bound = bound
         self.board_size = board_size
+        self.backbone = None
+        self.backbone_optimizer = None
 
         """
         Register the actor and critic modules here. You do not need to further design the structures at this step.
@@ -553,8 +680,24 @@ class GobangModel(nn.Module):
         # Register Actor and Critic
         extra_specs = extra_specs or {}
         action_injection = extra_specs.get('action_injection', 'early')
-        self.actor = Actor(board_size=board_size, lr=lr, model_type=model_type, extra_specs=extra_specs)
-        self.critic = Critic(board_size=board_size, lr=lr, model_type=model_type, action_injection=action_injection, extra_specs=extra_specs)
+        use_backbone = extra_specs.get('use_backbone', False)
+        backbone = None
+        if use_backbone:
+            if model_type not in ["cnn", "transformer"]:
+                raise ValueError("use_backbone only supports model_type 'cnn' and 'transformer'.")
+            if action_injection not in ["late", "fc"]:
+                raise ValueError("use_backbone is only compatible with action_injection 'late' or 'fc'.")
+            backbone = Backbone(board_size=board_size, model_type=model_type, extra_specs=extra_specs)
+        self.backbone = backbone
+        self.actor = Actor(board_size=board_size, lr=lr, model_type=model_type, extra_specs=extra_specs, backbone=backbone)
+        self.critic = Critic(board_size=board_size, lr=lr, model_type=model_type, action_injection=action_injection, extra_specs=extra_specs, backbone=backbone)
+        if self.backbone is not None:
+            backbone_param_ids = {id(p) for p in self.backbone.parameters()}
+            actor_params = [p for p in self.actor.parameters() if id(p) not in backbone_param_ids]
+            critic_params = [p for p in self.critic.parameters() if id(p) not in backbone_param_ids]
+            self.actor.optimizer = torch.optim.Adam(params=actor_params, lr=lr)
+            self.critic.optimizer = torch.optim.Adam(params=critic_params, lr=lr)
+            self.backbone_optimizer = torch.optim.Adam(params=self.backbone.parameters(), lr=lr)
         # END YOUR CODE
 
         self.to(device)
@@ -584,15 +727,27 @@ class GobangModel(nn.Module):
         aimed_policy = policy[torch.arange(len(indices)), indices]
         actor_loss = -torch.mean(torch.log(aimed_policy + eps) * qs.clone().detach())
 
-        self.actor.optimizer.zero_grad()
-        actor_loss.backward()
-        # Bug 2: Actor Optimizer Step
-        self.actor.optimizer.step()
-        
-        self.critic.optimizer.zero_grad()
-        critic_loss.backward()
-        # Bug 3: Critic Optimizer Step
-        self.critic.optimizer.step()
+        if self.backbone is not None:
+            self.actor.optimizer.zero_grad()
+            self.critic.optimizer.zero_grad()
+            if self.backbone_optimizer is not None:
+                self.backbone_optimizer.zero_grad()
+            total_loss = actor_loss + critic_loss
+            total_loss.backward()
+            self.actor.optimizer.step()
+            self.critic.optimizer.step()
+            if self.backbone_optimizer is not None:
+                self.backbone_optimizer.step()
+        else:
+            self.actor.optimizer.zero_grad()
+            actor_loss.backward()
+            # Bug 2: Actor Optimizer Step
+            self.actor.optimizer.step()
+            
+            self.critic.optimizer.zero_grad()
+            critic_loss.backward()
+            # Bug 3: Critic Optimizer Step
+            self.critic.optimizer.step()
         
         return actor_loss, critic_loss
 
@@ -605,6 +760,7 @@ if __name__ == "__main__":
     parser.add_argument('--gamma', type=float, default=0.5, help='discount factor for training (default: 0.5)')
     parser.add_argument('--reward-type', type=str, default='default', dest='reward_type', 
                         help='reward type: default, heuristic (default: default)')
+    parser.add_argument('--algorithm', type=str, default='ac', help='training algorithm: ac (actor-critic), a2c (advantage actor-critic), sac (soft actor-critic)')
     parser.add_argument('--use_wandb', action='store_true', help='use wandb for experiment tracking (requires wandb installed)')
     parser.add_argument('--wandb_project', type=str, default='gobang-rl-AI3002', help='wandb project name')
     parser.add_argument('--wandb_name', type=str, default=None, help='wandb run name')

@@ -119,7 +119,7 @@ if NUMBA_AVAILABLE:
 
 class UtilGobang:
     # Heuristic scoring constants (used by evaluate_board and heuristic reward)
-    SCORE_BASE = 3
+    SCORE_BASE = 10
     SCORE_FIVE = SCORE_BASE ** 5
     SCORE_LIVE_FOUR = SCORE_BASE ** 4
     SCORE_DEAD_FOUR = SCORE_BASE ** 3
@@ -367,7 +367,7 @@ class UtilGobang:
           separately to avoid exploding critic targets.
         """
 
-        raise DeprecationWarning("This function is deprecated. Use board_potential instead.")
+        # raise DeprecationWarning("This function is deprecated. Use board_potential instead.")
 
         board = np.asarray(board, dtype=np.int8)
         score = 0
