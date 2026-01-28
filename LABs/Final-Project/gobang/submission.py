@@ -661,12 +661,13 @@ class GobangModel(nn.Module):
     and action tensors "action", it directly outputs self.actor(x) and self.critic(x, action) as the policy and Q-values
     respectively.
     """
-    def __init__(self, board_size: int, bound: int, model_type: str = "default", extra_specs: dict = None, lr: float = 1e-4):
+    def __init__(self, board_size: int, bound: int, model_type: str = "default", extra_specs: dict = None, lr: float = 1e-4, algorithm: str = "ac"):
         super().__init__()
         self.bound = bound
         self.board_size = board_size
         self.backbone = None
         self.backbone_optimizer = None
+        self.algorithm = algorithm
 
         """
         Register the actor and critic modules here. You do not need to further design the structures at this step.
@@ -725,7 +726,18 @@ class GobangModel(nn.Module):
         critic_loss = nn.MSELoss()(targets, qs)
         indices = torch.tensor([_position_to_index(self.board_size, x, y) for x, y in actions]).to(device)
         aimed_policy = policy[torch.arange(len(indices)), indices]
-        actor_loss = -torch.mean(torch.log(aimed_policy + eps) * qs.clone().detach())
+        
+        # Compute actor loss based on algorithm type
+        if self.algorithm == "a2c":
+            # A2C: Use advantages instead of Q-values
+            # Compute baseline as expected Q-value: V(s) = sum_a [pi(a|s) * Q(s,a)]
+            # We approximate this using the current policy and critic
+            # Advantage A(s,a) = Q(s,a) - V(s)
+            advantages = qs.clone().detach() - torch.mean(qs.detach())
+            actor_loss = -torch.mean(torch.log(aimed_policy + eps) * advantages)
+        else:
+            # Standard AC: Use Q-values directly
+            actor_loss = -torch.mean(torch.log(aimed_policy + eps) * qs.clone().detach())
 
         if self.backbone is not None:
             self.actor.optimizer.zero_grad()
@@ -760,7 +772,7 @@ if __name__ == "__main__":
     parser.add_argument('--gamma', type=float, default=0.5, help='discount factor for training (default: 0.5)')
     parser.add_argument('--reward-type', type=str, default='default', dest='reward_type', 
                         help='reward type: default, heuristic (default: default)')
-    parser.add_argument('--algorithm', type=str, default='ac', help='training algorithm: ac (actor-critic), a2c (advantage actor-critic), sac (soft actor-critic)')
+    parser.add_argument('--algorithm', type=str, default='ac', help='training algorithm: ac (actor-critic), a2c (advantage actor-critic)')
     parser.add_argument('--use_wandb', action='store_true', help='use wandb for experiment tracking (requires wandb installed)')
     parser.add_argument('--wandb_project', type=str, default='gobang-rl-AI3002', help='wandb project name')
     parser.add_argument('--wandb_name', type=str, default=None, help='wandb run name')
@@ -812,8 +824,8 @@ if __name__ == "__main__":
         except ImportError:
             pass
         
-    agent = GobangModel(board_size=12, bound=5, model_type=args.model_type, extra_specs=extra_specs, lr=args.lr).to(device)
-    print(f"Model initialized. Model Type: {args.model_type}, Extra Specs: {extra_specs}")
+    agent = GobangModel(board_size=12, bound=5, model_type=args.model_type, extra_specs=extra_specs, lr=args.lr, algorithm=args.algorithm).to(device)
+    print(f"Model initialized. Model Type: {args.model_type}, Algorithm: {args.algorithm}, Extra Specs: {extra_specs}")
     # 打印模型参数量
     total_params = sum(p.numel() for p in agent.parameters() if p.requires_grad)
     print(f"Total trainable parameters: {total_params}")
@@ -844,6 +856,7 @@ if __name__ == "__main__":
         f.write(f'num_episodes: {num_episodes}\n')
         f.write(f'checkpoint: {checkpoint}\n')
         f.write(f'model_type: {args.model_type}\n')
+        f.write(f'algorithm: {args.algorithm}\n')
         f.write(f'extra_specs: {extra_specs}\n')
         f.write(f'lr: {args.lr}\n')
         f.write(f'gamma: {args.gamma}\n')
