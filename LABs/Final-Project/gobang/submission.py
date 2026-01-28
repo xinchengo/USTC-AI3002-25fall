@@ -128,6 +128,8 @@ class Actor(nn.Module):
                 out_channels = channels if i == 0 else channels
                 layers.extend(conv_block(in_channels, out_channels))
                 in_channels = out_channels
+
+            
             
             self.conv_blocks = nn.Sequential(*layers)
             flat_features = channels * board_size * board_size
@@ -288,6 +290,11 @@ class Critic(nn.Module):
         else:
             in_channels = 1
         
+        # Shared specs for attention/transformer
+        embed_dim = self.extra_specs.get('embed_dim', 64)
+        num_heads = self.extra_specs.get('num_heads', 4)
+        num_layers = self.extra_specs.get('num_layers', 2)
+
         if model_type == "default":
             use_deep = self.extra_specs.get('use_deep', False)
             
@@ -324,7 +331,7 @@ class Critic(nn.Module):
             else:
                 self.fc = nn.Linear(flat_features, board_size * board_size)
                 
-        elif model_type in ["cnn", "attention", "transformer"]:
+        elif model_type == "cnn":
             # Get architecture specs
             depth = self.extra_specs.get('depth', 3)
             channels = self.extra_specs.get('channels', 64)  # Changed default from 32 to 64
@@ -359,6 +366,34 @@ class Critic(nn.Module):
                 self.fc = nn.Linear(flat_features + 2, board_size * board_size)  # +2 for (x, y) action
             else:
                 self.fc = nn.Linear(flat_features, board_size * board_size)
+        elif model_type == "attention":
+            # Attention Critic: CNN -> Self-Attention -> per-position Q
+            self.feature_extractor = nn.Sequential(
+                nn.Conv2d(in_channels, 32, kernel_size=3, padding=1), nn.ReLU(),
+                nn.Conv2d(32, embed_dim, kernel_size=3, padding=1), nn.ReLU()
+            )
+            self.late_proj = None
+            if action_injection == "late":
+                self.late_proj = nn.Conv2d(embed_dim + 1, embed_dim, kernel_size=1)
+            self.pos_encoder = PositionalEncoding(embed_dim, max_len=board_size * board_size)
+            self.attention = nn.MultiheadAttention(embed_dim=embed_dim, num_heads=num_heads, batch_first=True)
+            self.norm = nn.LayerNorm(embed_dim)
+            head_in_dim = embed_dim + (2 if action_injection == "fc" else 0)
+            self.output_head = nn.Linear(head_in_dim, 1)
+        elif model_type == "transformer":
+            # Transformer Critic: Embedding -> Encoder -> per-position Q
+            self.embedding = nn.Sequential(
+                nn.Conv2d(in_channels, embed_dim, kernel_size=3, padding=1),
+                nn.ReLU()
+            )
+            self.late_proj = None
+            if action_injection == "late":
+                self.late_proj = nn.Conv2d(embed_dim + 1, embed_dim, kernel_size=1)
+            self.pos_encoder = PositionalEncoding(embed_dim, max_len=board_size * board_size)
+            encoder_layer = nn.TransformerEncoderLayer(d_model=embed_dim, nhead=num_heads, batch_first=True)
+            self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+            head_in_dim = embed_dim + (2 if action_injection == "fc" else 0)
+            self.output_head = nn.Linear(head_in_dim, 1)
         else:
             raise NotImplementedError(f"Model type '{model_type}' not implemented for Critic.")
         # END YOUR CODE
@@ -395,52 +430,97 @@ class Critic(nn.Module):
                 action_mask[i, 0, int(ax), int(ay)] = 1.0
             # Concatenate board and action mask
             output = torch.cat([output, action_mask], dim=1)  # (B, 2, N, N)
-            out = self.conv_blocks(output)
+            if self.model_type in ["default", "cnn"]:
+                out = self.conv_blocks(output)
+            else:
+                out = output
         
         # Late injection: inject action before last conv layer
         elif self.action_injection == "late":
             # Process through all but last conv layer
             # Count the number of layers: each conv block has [Conv2d, (BatchNorm2d), ReLU]
             # We want to inject before the final conv layer
-            layers_list = list(self.conv_blocks)
-            # Find the last Conv2d layer
-            last_conv_idx = -1
-            for i in range(len(layers_list) - 1, -1, -1):
-                if isinstance(layers_list[i], nn.Conv2d):
-                    last_conv_idx = i
-                    break
-            
-            # Process layers before the last conv
-            for i in range(last_conv_idx):
-                output = layers_list[i](output)
-            
-            # Create action mask and inject
-            action_mask = torch.zeros(batch_size, 1, self.board_size, self.board_size).to(device)
-            for j, (ax, ay) in enumerate(action_tensor):
-                action_mask[j, 0, int(ax), int(ay)] = 1.0
-            # Concatenate features with action mask before last conv
-            output = torch.cat([output, action_mask], dim=1)
-            
-            # Process remaining layers (last conv and any following layers)
-            for i in range(last_conv_idx, len(layers_list)):
-                output = layers_list[i](output)
-            out = output
+            if self.model_type in ["default", "cnn"]:
+                layers_list = list(self.conv_blocks)
+                # Find the last Conv2d layer
+                last_conv_idx = -1
+                for i in range(len(layers_list) - 1, -1, -1):
+                    if isinstance(layers_list[i], nn.Conv2d):
+                        last_conv_idx = i
+                        break
+                
+                # Process layers before the last conv
+                for i in range(last_conv_idx):
+                    output = layers_list[i](output)
+                
+                # Create action mask and inject
+                action_mask = torch.zeros(batch_size, 1, self.board_size, self.board_size).to(device)
+                for j, (ax, ay) in enumerate(action_tensor):
+                    action_mask[j, 0, int(ax), int(ay)] = 1.0
+                # Concatenate features with action mask before last conv
+                output = torch.cat([output, action_mask], dim=1)
+                
+                # Process remaining layers (last conv and any following layers)
+                for i in range(last_conv_idx, len(layers_list)):
+                    output = layers_list[i](output)
+                out = output
+            else:
+                out = output
         
         # FC injection or no injection
         else:
-            out = self.conv_blocks(output)
+            if self.model_type in ["default", "cnn"]:
+                out = self.conv_blocks(output)
+            else:
+                out = output
         
-        # Flatten features
-        out = out.view(out.size(0), -1)
-        
-        # FC injection: concatenate action coordinates to features
-        if self.action_injection == "fc":
-            # Normalize action coordinates to [0, 1]
-            action_coords = action_tensor / self.board_size
-            out = torch.cat([out, action_coords], dim=1)
-        
-        # Generate Q-values for all positions
-        q_values_all = self.fc(out)
+        if self.model_type in ["default", "cnn"]:
+            # Flatten features
+            out = out.view(out.size(0), -1)
+
+            # FC injection: concatenate action coordinates to features
+            if self.action_injection == "fc":
+                # Normalize action coordinates to [0, 1]
+                action_coords = action_tensor / self.board_size
+                out = torch.cat([out, action_coords], dim=1)
+
+            # Generate Q-values for all positions
+            q_values_all = self.fc(out)
+        elif self.model_type == "attention":
+            # CNN -> attention -> per-position Q
+            features = self.feature_extractor(out)
+            if self.action_injection == "late":
+                action_mask = torch.zeros(batch_size, 1, self.board_size, self.board_size).to(device)
+                for i, (ax, ay) in enumerate(action_tensor):
+                    action_mask[i, 0, int(ax), int(ay)] = 1.0
+                features = torch.cat([features, action_mask], dim=1)
+                features = self.late_proj(features)
+            features = features.view(batch_size, features.size(1), -1).permute(0, 2, 1)
+            features = self.pos_encoder(features)
+            attn_output, _ = self.attention(features, features, features)
+            features = self.norm(features + attn_output)
+            if self.action_injection == "fc":
+                action_coords = (action_tensor / self.board_size).unsqueeze(1).expand(-1, features.size(1), -1)
+                features = torch.cat([features, action_coords], dim=-1)
+            q_values_all = self.output_head(features).squeeze(-1)
+        elif self.model_type == "transformer":
+            # Embedding -> transformer -> per-position Q
+            features = self.embedding(out)
+            if self.action_injection == "late":
+                action_mask = torch.zeros(batch_size, 1, self.board_size, self.board_size).to(device)
+                for i, (ax, ay) in enumerate(action_tensor):
+                    action_mask[i, 0, int(ax), int(ay)] = 1.0
+                features = torch.cat([features, action_mask], dim=1)
+                features = self.late_proj(features)
+            features = features.view(batch_size, features.size(1), -1).permute(0, 2, 1)
+            features = self.pos_encoder(features)
+            features = self.transformer_encoder(features)
+            if self.action_injection == "fc":
+                action_coords = (action_tensor / self.board_size).unsqueeze(1).expand(-1, features.size(1), -1)
+                features = torch.cat([features, action_coords], dim=-1)
+            q_values_all = self.output_head(features).squeeze(-1)
+        else:
+            raise NotImplementedError(f"Model type '{self.model_type}' not implemented in Critic forward.")
         
         # Extract Q-values for specified actions
         output = q_values_all.gather(1, indices.unsqueeze(1))
@@ -472,7 +552,7 @@ class GobangModel(nn.Module):
         # self.critic = Critic(board_size=board_size, ...)
         # Register Actor and Critic
         extra_specs = extra_specs or {}
-        action_injection = extra_specs.get('action_injection', 'none')
+        action_injection = extra_specs.get('action_injection', 'early')
         self.actor = Actor(board_size=board_size, lr=lr, model_type=model_type, extra_specs=extra_specs)
         self.critic = Critic(board_size=board_size, lr=lr, model_type=model_type, action_injection=action_injection, extra_specs=extra_specs)
         # END YOUR CODE

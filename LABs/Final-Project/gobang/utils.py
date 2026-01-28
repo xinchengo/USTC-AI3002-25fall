@@ -27,6 +27,19 @@ print(f"Current device is {device}.")
 
 
 class UtilGobang:
+    # Heuristic scoring constants (used by evaluate_board and heuristic reward)
+    SCORE_BASE = 3
+    SCORE_FIVE = SCORE_BASE ** 5
+    SCORE_LIVE_FOUR = SCORE_BASE ** 4
+    SCORE_DEAD_FOUR = SCORE_BASE ** 3
+    SCORE_LIVE_THREE = SCORE_BASE ** 3
+    SCORE_DEAD_THREE = SCORE_BASE ** 2
+    SCORE_LIVE_TWO = SCORE_BASE ** 2
+    SCORE_DEAD_TWO = SCORE_BASE ** 1
+    WIN_REWARD = 10.0
+
+    BASE_GROWTH_EXP = 2.5
+
     def __init__(self, board_size, bound):
         self.board_size, self.bound = board_size, bound
         self.board = np.zeros((board_size, board_size))
@@ -173,31 +186,96 @@ class UtilGobang:
             f"The evaluated winning probability for the black pieces is "
             f"{black_wins / (black_wins + white_wins + ties)}."
         )
-    
-    def evaluate_board(self, board, color):
+
+    def board_potential(self, board, player: int) -> float:
+        """
+        评估函数：一个棋盘关于某一方的“势能”。
+        """
+
+        assert self.bound == 5, "This function only supports standard Gobang with bound 5."
+        n = self.board_size
+        BOUND = 5
+        base_exp = float(self.BASE_GROWTH_EXP)
+
+        board = np.asarray(board, dtype=np.int8)
+
+        # openness 指的是连续段的开放端数量，取值范围为 {0, 1, 2}
+        weights_by_openness = (0.0, 0.4, 1.0)
+
+        # 扫描线算法
+        def scan_line(sr: int, sc: int, dr: int, dc: int) -> float:
+            line_score = 0.0
+            r, c = sr, sc
+            run_len = 0
+            run_start_r = 0
+            run_start_c = 0
+            while 0 <= r < n and 0 <= c < n:
+                v = board[r, c]
+                if v == player:
+                    if run_len == 0:
+                        run_start_r = r
+                        run_start_c = c
+                    run_len += 1
+                else:
+                    if run_len != 0:
+                        head_r = run_start_r - dr
+                        head_c = run_start_c - dc
+                        head_open = 1 if (0 <= head_r < n and 0 <= head_c < n and board[head_r, head_c] == 0) else 0
+                        tail_open = 1 if v == 0 else 0
+                        openness = head_open + tail_open
+                        line_score += weights_by_openness[openness] * (float(run_len) / BOUND) ** base_exp
+                        run_len = 0
+                r += dr
+                c += dc
+
+            if run_len != 0:
+                head_r = run_start_r - dr
+                head_c = run_start_c - dc
+                head_open = 1 if (0 <= head_r < n and 0 <= head_c < n and board[head_r, head_c] == 0) else 0
+                openness = head_open  # tail is out-of-bounds -> blocked
+                line_score += weights_by_openness[openness] * (float(run_len) / BOUND) ** base_exp
+            return line_score
+
+        score = 0.0
+
+        # Rows (0, 1)
+        for i in range(n):
+            score += scan_line(i, 0, 0, 1)
+
+        # Columns (1, 0)
+        for j in range(n):
+            score += scan_line(0, j, 1, 0)
+
+        # Primary diagonals (1, 1)
+        for j in range(n):
+            score += scan_line(0, j, 1, 1)
+        for i in range(1, n):
+            score += scan_line(i, 0, 1, 1)
+
+        # Secondary diagonals (1, -1)
+        for j in range(n):
+            score += scan_line(0, j, 1, -1)
+        for i in range(1, n):
+            score += scan_line(i, n - 1, 1, -1)
+
+        return float(score)
+               
+    def evaluate_board(self, board, color: int) -> int:
         """
         评估函数：基于棋型给予分数，而非简单的连珠长度。
         参考了传统五子棋 AI 的启发式评分。
+
+        Notes:
+        - Returns a (potentially large) heuristic score for `color` only.
+        - This function is used inside reward shaping; reward should be normalized
+          separately to avoid exploding critic targets.
         """
+
+        raise DeprecationWarning("This function is deprecated. Use board_potential instead.")
+
+        board = np.asarray(board, dtype=np.int8)
         score = 0
-        # 定义棋型分数
-        SCORE_FIVE = 100000
-        SCORE_LIVE_FOUR = 10000
-        SCORE_DEAD_FOUR = 1000
-        SCORE_LIVE_THREE = 1000
-        SCORE_DEAD_THREE = 100
-        SCORE_LIVE_TWO = 100
-        SCORE_DEAD_TWO = 10
-        
-        # 获取所有行、列、对角线
-        lines = []
-        # 横向
-        for r in range(self.board_size):
-            lines.append(board[r, :])
-        # 纵向
-        for c in range(self.board_size):
-            lines.append(board[:, c])
-        # 对角线
+
         directions = [(1, 0), (0, 1), (1, 1), (1, -1)]
         visited = set()
 
@@ -231,22 +309,22 @@ class UtilGobang:
                         blocked_tail = True
                     
                     if count >= 5:
-                        score += SCORE_FIVE
+                        score += self.SCORE_FIVE
                     elif count == 4:
                         if not blocked_head and not blocked_tail: # 活四
-                            score += SCORE_LIVE_FOUR
+                            score += self.SCORE_LIVE_FOUR
                         elif not (blocked_head and blocked_tail): # 冲四 (死四)
-                            score += SCORE_DEAD_FOUR
+                            score += self.SCORE_DEAD_FOUR
                     elif count == 3:
                         if not blocked_head and not blocked_tail: # 活三
-                            score += SCORE_LIVE_THREE
+                            score += self.SCORE_LIVE_THREE
                         elif not (blocked_head and blocked_tail): # 眠三
-                            score += SCORE_DEAD_THREE
+                            score += self.SCORE_DEAD_THREE
                     elif count == 2:
                         if not blocked_head and not blocked_tail: # 活二
-                            score += SCORE_LIVE_TWO
+                            score += self.SCORE_LIVE_TWO
                         elif not (blocked_head and blocked_tail): # 眠二
-                            score += SCORE_DEAD_TWO
+                            score += self.SCORE_DEAD_TWO
         return score
 
 
@@ -285,7 +363,7 @@ class Gobang(UtilGobang):
             return None
 
     def get_connection_and_reward(self, action: Tuple[int, int, int],
-                                  response: Tuple[int, int, int]) -> Tuple[int, int, int, int, float]:
+                                  response: Optional[Tuple[int, int, int]]) -> Tuple[int, int, int, int, float]:
         
         
         # Calculate reward based on reward_type
@@ -296,28 +374,117 @@ class Gobang(UtilGobang):
             reward = (black_2 ** 2 - white_2 ** 2) - (black_1 ** 2 - white_1 ** 2)
             return black_1, white_1, black_2, white_2, reward
         
+        elif self.reward_type == 'sparse':
+            # Sparse terminal-only reward.
+            # If black wins immediately after its move, opponent should NOT place a response.
+            # If white wins after the response, it's a loss for black.
+            # Otherwise reward is 0.
+            black_1, white_1 = self.count_max_connections(self.board)
+
+            next_state_after_black = self.get_next_state(action, None)
+            black_2_black_only, white_2_black_only = self.count_max_connections(next_state_after_black)
+            if black_2_black_only >= self.bound:
+                return black_1, white_1, black_2_black_only, white_1, float(self.WIN_REWARD)
+
+            next_state = self.get_next_state(action, response)
+            black_2, white_2 = self.count_max_connections(next_state)
+            if white_2 >= self.bound:
+                return black_1, white_1, black_2, white_2, float(-self.WIN_REWARD)
+
+            return black_1, white_1, black_2, white_2, 0.0
+        
+        elif self.reward_type == 'potential':
+            # PPO-friendly potential-based reward shaping.
+            defensive_awareness = 0.9
+            b1, w1 = self.count_max_connections(self.board)
+
+            # Potential definition: encourage our growth while discouraging opponent growth.
+            phi_1 = self.board_potential(self.board, 1) - defensive_awareness * self.board_potential(self.board, 2)
+
+            # Terminal handling must match game dynamics: if black wins after its move,
+            # the opponent should NOT place a response.
+            next_state_after_black = self.get_next_state(action, None)
+            b2_black_only, w2_black_only = self.count_max_connections(next_state_after_black)
+            if b2_black_only >= self.bound:
+                return b1, w1, b2_black_only, w2_black_only, float(self.WIN_REWARD)
+
+            next_state = self.get_next_state(action, response)
+            b2, w2 = self.count_max_connections(next_state)
+            phi_2 = self.board_potential(next_state, 1) - defensive_awareness * self.board_potential(next_state, 2)
+            reward = float(phi_2 - phi_1)
+
+            # If white wins after the response, treat as terminal loss.
+            if w2 >= self.bound:
+                reward = float(-self.WIN_REWARD)
+            return b1, w1, b2, w2, reward
+        
+        
         elif self.reward_type == 'heuristic':
             score_black_1 = self.evaluate_board(self.board, 1)
             score_white_1 = self.evaluate_board(self.board, 2)
+
+            b1, w1 = self.count_max_connections(self.board)
+
+            # Evaluate after black move first (terminal handling must ignore response).
+            next_state_after_black = self.get_next_state(action, None)
+            score_black_2_black_only = self.evaluate_board(next_state_after_black, 1)
+            score_white_2_black_only = self.evaluate_board(next_state_after_black, 2)
+            b2_black_only, w2_black_only = self.count_max_connections(next_state_after_black)
+
             next_state = self.get_next_state(action, response)
             score_black_2 = self.evaluate_board(next_state, 1)
             score_white_2 = self.evaluate_board(next_state, 2)
-            
-            # Reward    
-            scale = 100.0
-            
-            diff_black = (score_black_2 - score_black_1) / scale
-            diff_white = (score_white_2 - score_white_1) / scale
-            
-            reward = diff_black - 0.8 * diff_white
-            
-            # 如果这一步直接赢了，给予巨大额外奖励
-            if score_black_2 >= 100000: 
-                reward += 100.0
-
-            b1, w1 = self.count_max_connections(self.board)
             b2, w2 = self.count_max_connections(next_state)
+
+            # 使用分数差作为奖励的基础
+            value_1 = score_black_1 - score_white_1
+            value_2 = score_black_2 - score_white_2
+            delta = value_2 - value_1
+
+            # 使用 tanh 进行归一化，避免奖励过大
+            scale = float(self.SCORE_LIVE_FOUR) # 此尺度按照经验得到
+            reward = float(np.tanh(delta / (scale + 1e-6)))
+
+            # 终局处理
+            # 如果黑棋获胜，则忽略之前的奖励，直接给出固定胜利奖励
+            if b2_black_only >= self.bound or score_black_2_black_only >= self.SCORE_FIVE:
+                reward = self.WIN_REWARD
+                return b1, w1, b2_black_only, w2_black_only, reward
+            elif score_white_2 >= self.SCORE_FIVE or w2 >= self.bound:
+                reward = -self.WIN_REWARD
+
+            # # Reward    
+            # scale = 100.0
             
+            # diff_black = (score_black_2 - score_black_1) / scale
+            # diff_white = (score_white_2 - score_white_1) / scale
+            
+            # reward = diff_black - 0.8 * diff_white
+            
+            # # 如果这一步直接赢了，给予巨大额外奖励
+            # if score_black_2 >= 100000: 
+            #     reward += 100.0
+
+            # b1, w1 = self.count_max_connections(self.board)
+
+
+            # # 使用分数差作为奖励的基础
+            # value_1 = score_black_1 - score_white_1
+            # value_2 = score_black_2 - score_white_2
+            # delta = value_2 - value_1
+
+            # # 使用 tanh 进行归一化，避免奖励过大
+            # scale = float(self.SCORE_LIVE_FOUR) # 此尺度按照经验得到
+            # reward = float(np.tanh(delta / (scale + 1e-6)))
+
+            # # 终局处理
+            # # 如果黑棋获胜，则忽略之前的奖励，直接给出固定胜利奖励
+            # if b2_black_only >= self.bound or score_black_2_black_only >= self.SCORE_FIVE:
+            #     reward = self.WIN_REWARD
+            #     return b1, w1, b2_black_only, w2_black_only, reward
+            # elif score_white_2 >= self.SCORE_FIVE or w2 >= self.bound:
+            #     reward = -self.WIN_REWARD
+
             return b1, w1, b2, w2, reward
         
         else:
@@ -416,10 +583,14 @@ def train_model(model, num_episodes=1000, checkpoint=1000, gamma=0.5, save_dir="
             stop = True if (black_2 >= model.bound or white_2 >= model.bound
                             or len(np.nonzero(next_state == 0)[0]) == 0) else False
 
+            # Keep terminal-reward handling consistent with the selected reward_type.
+            # The original code overwrote heuristic rewards with the default formula.
             if black_2 >= model.bound:
+                # If black wins immediately, there is no opponent response in the environment transition.
                 next_state = _get_next_state(state, action, None)
-                white_2 = white_1
-                reward = (black_2 ** 2 - white_2 ** 2) - (black_1 ** 2 - white_1 ** 2)
+                if reward_type == 'default':
+                    white_2 = white_1
+                    reward = (black_2 ** 2 - white_2 ** 2) - (black_1 ** 2 - white_1 ** 2)
 
             states.append([state])
             actions.append([action[1], action[2]])
