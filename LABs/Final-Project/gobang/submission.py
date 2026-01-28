@@ -349,7 +349,7 @@ class Critic(nn.Module):
     Finally, it returns a tensor of shape (B,) containing these Q-values.
     """
 
-    def __init__(self, board_size: int, lr=1e-4, model_type: str = "default", action_injection: str = "none", extra_specs: dict = None, backbone: Optional[Backbone] = None):
+    def __init__(self, board_size: int, lr=1e-4, model_type: str = "default", action_injection: str = "late", extra_specs: dict = None, backbone: Optional[Backbone] = None):
         super().__init__()
         self.board_size = board_size
         self.model_type = model_type
@@ -679,7 +679,7 @@ class GobangModel(nn.Module):
         # self.critic = Critic(board_size=board_size, ...)
         # Register Actor and Critic
         extra_specs = extra_specs or {}
-        action_injection = extra_specs.get('action_injection', 'early')
+        action_injection = extra_specs.get('action_injection', 'late')
         use_backbone = extra_specs.get('use_backbone', False)
         backbone = None
         if use_backbone:
