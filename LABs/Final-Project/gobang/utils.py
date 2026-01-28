@@ -16,6 +16,14 @@ except ImportError:
     WANDB_AVAILABLE = False
     print("Warning: wandb not installed. Install with 'pip install wandb' to enable experiment tracking.")
 
+# 可选导入 numba，如果未安装则跳过
+try:
+    from numba import njit
+    NUMBA_AVAILABLE = True
+except ImportError:
+    NUMBA_AVAILABLE = False
+    print("Warning: numba not installed. Install with 'pip install numba' to enable JIT acceleration.")
+
 # if torch.backends.mps.is_available():
 #     device = torch.device("mps")
 # elif torch.cuda.is_available():
@@ -24,6 +32,89 @@ except ImportError:
 #     device = torch.device("cpu")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Current device is {device}.")
+
+
+if NUMBA_AVAILABLE:
+    @njit(cache=True)
+    def _count_max_connections_for_single_color_numba(state, board_size, color):
+        directions = ((1, 1), (1, 0), (0, 1), (1, -1))
+        max_connections = 0
+        for i in range(board_size):
+            for j in range(board_size):
+                for d in range(4):
+                    direction_x, direction_y = directions[d]
+                    current_pos_x, current_pos_y = i, j
+                    current_connections = 0
+                    while 0 <= current_pos_x < board_size and 0 <= current_pos_y < board_size:
+                        if state[current_pos_x][current_pos_y] == color:
+                            current_connections += 1
+                        else:
+                            break
+                        current_pos_x += direction_x
+                        current_pos_y += direction_y
+                    if current_connections > max_connections:
+                        max_connections = current_connections
+        return max_connections
+
+    @njit(cache=True)
+    def _board_potential_numba(board, board_size, player, bound, base_exp):
+        weights_by_openness = (0.0, 0.4, 1.0)
+        score = 0.0
+
+        def scan_line(sr, sc, dr, dc):
+            line_score = 0.0
+            r, c = sr, sc
+            run_len = 0
+            run_start_r = 0
+            run_start_c = 0
+            while 0 <= r < board_size and 0 <= c < board_size:
+                v = board[r, c]
+                if v == player:
+                    if run_len == 0:
+                        run_start_r = r
+                        run_start_c = c
+                    run_len += 1
+                else:
+                    if run_len != 0:
+                        head_r = run_start_r - dr
+                        head_c = run_start_c - dc
+                        head_open = 1 if (0 <= head_r < board_size and 0 <= head_c < board_size and board[head_r, head_c] == 0) else 0
+                        tail_open = 1 if v == 0 else 0
+                        openness = head_open + tail_open
+                        line_score += weights_by_openness[openness] * (float(run_len) / bound) ** base_exp
+                        run_len = 0
+                r += dr
+                c += dc
+
+            if run_len != 0:
+                head_r = run_start_r - dr
+                head_c = run_start_c - dc
+                head_open = 1 if (0 <= head_r < board_size and 0 <= head_c < board_size and board[head_r, head_c] == 0) else 0
+                openness = head_open
+                line_score += weights_by_openness[openness] * (float(run_len) / bound) ** base_exp
+            return line_score
+
+        # Rows (0, 1)
+        for i in range(board_size):
+            score += scan_line(i, 0, 0, 1)
+
+        # Columns (1, 0)
+        for j in range(board_size):
+            score += scan_line(0, j, 1, 0)
+
+        # Primary diagonals (1, 1)
+        for j in range(board_size):
+            score += scan_line(0, j, 1, 1)
+        for i in range(1, board_size):
+            score += scan_line(i, 0, 1, 1)
+
+        # Secondary diagonals (1, -1)
+        for j in range(board_size):
+            score += scan_line(0, j, 1, -1)
+        for i in range(1, board_size):
+            score += scan_line(i, board_size - 1, 1, -1)
+
+        return score
 
 
 class UtilGobang:
@@ -89,6 +180,8 @@ class UtilGobang:
         return 0 <= x < self.board_size and 0 <= y < self.board_size
 
     def count_max_connections_for_single_color(self, state, color) -> int:
+        if NUMBA_AVAILABLE:
+            return int(_count_max_connections_for_single_color_numba(state, self.board_size, color))
         directions = [(1, 1), (1, 0), (0, 1), (1, -1)]
         max_connections = 0
         for i in range(self.board_size):
@@ -198,6 +291,9 @@ class UtilGobang:
         base_exp = float(self.BASE_GROWTH_EXP)
 
         board = np.asarray(board, dtype=np.int8)
+
+        if NUMBA_AVAILABLE:
+            return float(_board_potential_numba(board, n, player, BOUND, base_exp))
 
         # openness 指的是连续段的开放端数量，取值范围为 {0, 1, 2}
         weights_by_openness = (0.0, 0.4, 1.0)
