@@ -776,6 +776,7 @@ if __name__ == "__main__":
     parser.add_argument('--reward-type', type=str, default='default', dest='reward_type', 
                         help='reward type: default, heuristic (default: default)')
     parser.add_argument('--algorithm', type=str, default='ac', help='training algorithm: ac (actor-critic), a2c (advantage actor-critic)')
+    parser.add_argument('--use_rotation', action='store_true', help='use board rotation augmentation during training')
     # parser.add_argument('--num_envs', type=int, default=1, help='number of parallel environments (default: 1)')
     parser.add_argument('--use_wandb', action='store_true', help='use wandb for experiment tracking (requires wandb installed)')
     parser.add_argument('--wandb_project', type=str, default='gobang-rl-AI3002', help='wandb project name')
@@ -842,7 +843,7 @@ if __name__ == "__main__":
     print(f"Models will be saved to: {save_folder}")
     os.makedirs(save_folder, exist_ok=True)
     # 传递 save_dir 给 train_model
-    train_model(agent, num_episodes=num_episodes, checkpoint=checkpoint, gamma=args.gamma, save_dir=save_folder, reward_type=args.reward_type)
+    train_model(agent, num_episodes=num_episodes, checkpoint=checkpoint, gamma=args.gamma, save_dir=save_folder, reward_type=args.reward_type, use_rotation=args.use_rotation)
 
     import pickle
     # 保存 最终模型

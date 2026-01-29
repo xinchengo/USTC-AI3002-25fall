@@ -68,14 +68,76 @@ class CheckpointWrapper(BaseWrapper):
         elif model_path.endswith('.pth'):
             # Load state dict and reconstruct model
             from submission import GobangModel
-            # For backward compatibility, determine model type from filename if not specified
-            if model_type == "default" and ('deep' in model_path.lower()):
-                actual_extra_specs = {'use_deep': True}
-            else:
-                actual_extra_specs = self.extra_specs
-
-            self.model = GobangModel(board_size=board_size, bound=bound, model_type=self.model_type, extra_specs=actual_extra_specs)
+            
+            # Load state dict first to inspect its keys
             state_dict = torch.load(model_path, map_location=device)
+            
+            # Detect architecture from state_dict keys
+            has_backbone = any('backbone.' in key for key in state_dict.keys())
+            has_transformer = any('transformer_encoder' in key for key in state_dict.keys())
+            has_attention = any('attention' in key for key in state_dict.keys())
+            use_deep = any('conv_blocks.4' in key for key in state_dict.keys()) or any('conv_blocks.6' in key for key in state_dict.keys())
+            
+            # Determine model type and extra specs
+            actual_extra_specs = dict(self.extra_specs)  # Copy to avoid modifying original
+            
+            if has_transformer:
+                # This is a transformer model
+                if self.model_type == "default":
+                    self.model_type = "transformer"
+                actual_extra_specs['use_backbone'] = has_backbone
+                
+                # Detect number of transformer layers
+                max_layer_idx = -1
+                for key in state_dict.keys():
+                    if 'transformer_encoder.layers.' in key:
+                        # Extract layer index
+                        parts = key.split('transformer_encoder.layers.')
+                        if len(parts) > 1:
+                            layer_idx_str = parts[1].split('.')[0]
+                            if layer_idx_str.isdigit():
+                                max_layer_idx = max(max_layer_idx, int(layer_idx_str))
+                
+                if max_layer_idx >= 0:
+                    num_layers = max_layer_idx + 1
+                    actual_extra_specs['num_layers'] = num_layers
+                    print(f"Detected {num_layers} transformer layers")
+                
+            elif has_attention:
+                # This is an attention model
+                if self.model_type == "default":
+                    self.model_type = "attention"
+                actual_extra_specs['use_backbone'] = has_backbone
+            elif use_deep:
+                # This is a deep CNN model
+                actual_extra_specs['use_deep'] = True
+            
+            # Detect action injection strategy for critic
+            has_late_proj = 'critic.late_proj.weight' in state_dict
+            if has_late_proj:
+                actual_extra_specs['action_injection'] = 'late'
+            
+            # Detect CNN depth for CNN/default models
+            if self.model_type in ["default", "cnn"]:
+                max_conv_idx = -1
+                for key in state_dict.keys():
+                    if 'conv_blocks.' in key:
+                        parts = key.split('conv_blocks.')
+                        if len(parts) > 1:
+                            idx_str = parts[1].split('.')[0]
+                            if idx_str.isdigit():
+                                max_conv_idx = max(max_conv_idx, int(idx_str))
+                
+                if max_conv_idx >= 0:
+                    # Each depth level has 3 layers (Conv, BN optional, ReLU)
+                    # Approximate depth based on highest index
+                    estimated_depth = (max_conv_idx + 1) // 3
+                    if estimated_depth > 0:
+                        actual_extra_specs['depth'] = estimated_depth
+            
+            print(f"Auto-detected model architecture: type={self.model_type}, use_backbone={actual_extra_specs.get('use_backbone', False)}, extra_specs={actual_extra_specs}")
+            
+            self.model = GobangModel(board_size=board_size, bound=bound, model_type=self.model_type, extra_specs=actual_extra_specs)
             self.model.load_state_dict(state_dict)
             self.model.to(device)
             self.model.eval()

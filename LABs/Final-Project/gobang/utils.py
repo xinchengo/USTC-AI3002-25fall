@@ -663,7 +663,74 @@ def _get_next_state(state, action, response):
     return next_state
 
 
-def train_model(model, num_episodes=1000, checkpoint=1000, gamma=0.5, save_dir="checkpoints", reward_type='default'):
+def _rotate_action(action, board_size, rotation_times):
+    """
+    Rotate action coordinates by 90*rotation_times degrees.
+    rotation_times: 0, 1, 2, 3 for 0°, 90°, 180°, 270°
+    """
+    x, y = action
+    for _ in range(rotation_times % 4):
+        x, y = y, board_size - 1 - x
+    return x, y
+
+
+def _flip_action(action, board_size, axis):
+    """
+    Flip action coordinates.
+    axis: 0 for vertical flip (top-bottom), 1 for horizontal flip (left-right)
+    """
+    x, y = action
+    if axis == 0:  # vertical flip
+        x = board_size - 1 - x
+    elif axis == 1:  # horizontal flip
+        y = board_size - 1 - y
+    return x, y
+
+
+def _augment_board_and_action(board, action, augmentation_type):
+    """
+    Apply augmentation to board and transform action accordingly.
+    augmentation_type: tuple (transform_type, param)
+        - ('rotate', k) for rotation by k*90 degrees (k=0,1,2,3)
+        - ('flip', axis) for flip (axis=0 for vertical, 1 for horizontal)
+        - ('identity', None) for no transformation
+    Returns: (augmented_board, transformed_action)
+    """
+    board_size = board.shape[0]
+    aug_board = np.array(board, copy=True)
+    aug_action = action
+    
+    transform_type, param = augmentation_type
+    
+    if transform_type == 'rotate':
+        rotation_times = param
+        aug_board = np.rot90(aug_board, rotation_times)
+        aug_action = _rotate_action(aug_action, board_size, rotation_times)
+    elif transform_type == 'flip':
+        axis = param
+        aug_board = np.flip(aug_board, axis=axis)
+        aug_action = _flip_action(aug_action, board_size, axis)
+    # 'identity' does nothing
+    
+    return aug_board, aug_action
+
+
+def _get_augmentation_types():
+    """
+    Generate all 8 dihedral symmetries: 4 rotations × 2 reflections.
+    Returns list of augmentation_type tuples.
+    """
+    augmentations = [('identity', None)]
+    # Add 4 rotations
+    for k in range(1, 4):
+        augmentations.append(('rotate', k))
+    # Add 2 flips (which create the 4 reflection-rotations)
+    for axis in range(2):
+        augmentations.append(('flip', axis))
+    return augmentations
+
+
+def train_model(model, num_episodes=1000, checkpoint=1000, gamma=0.5, save_dir="checkpoints", reward_type='default', use_rotation=False):
     chess_board = Gobang(board_size=model.board_size, bound=model.bound, training=True, reward_type=reward_type)
     actor_records, critic_records, entropy_records = [], [], []
     for _ in range(num_episodes):
@@ -695,9 +762,38 @@ def train_model(model, num_episodes=1000, checkpoint=1000, gamma=0.5, save_dir="
             if stop:
                 break
 
-        states = torch.tensor(np.array(states)).to(torch.float32).to(device)
-        rewards = torch.tensor(np.array(rewards)).to(torch.float32).to(device)
-        actions = torch.tensor(np.array(actions)).to(torch.float32).to(device)
+        # Apply data augmentation if enabled
+        if use_rotation:
+            augmented_states = []
+            augmented_actions = []
+            augmented_rewards = []
+            augmentation_types = _get_augmentation_types()
+            
+            for state, action, reward in zip(states, actions, rewards):
+                # state is shape [1, N, N], action is [x, y]
+                board = state[0].numpy() if isinstance(state, torch.Tensor) else state[0]
+                if isinstance(action, torch.Tensor):
+                    ax, ay = int(action[0].numpy()), int(action[1].numpy())
+                else:
+                    ax, ay = int(action[0]), int(action[1])
+                
+                for aug_type in augmentation_types:
+                    aug_board, (aug_x, aug_y) = _augment_board_and_action(board, (ax, ay), aug_type)
+                    augmented_states.append([aug_board])
+                    augmented_actions.append([aug_x, aug_y])
+                    augmented_rewards.append(reward)
+            
+            states = np.array(augmented_states)
+            actions = np.array(augmented_actions)
+            rewards = np.array(augmented_rewards)
+        else:
+            states = np.array(states)
+            actions = np.array(actions)
+            rewards = np.array(rewards)
+        
+        states = torch.tensor(states).to(torch.float32).to(device)
+        rewards = torch.tensor(rewards).to(torch.float32).to(device)
+        actions = torch.tensor(actions).to(torch.float32).to(device)
 
         policy, qs = model(states, actions)
         next_qs = qs[1:]
@@ -739,4 +835,5 @@ def train_model(model, num_episodes=1000, checkpoint=1000, gamma=0.5, save_dir="
 
 
 __all__ = ['_position_to_index', '_index_to_position', '_sample_response', 'train_model',
-           '_sample_action_and_response', '_get_next_state', 'UtilGobang', 'Gobang', 'device']
+           '_sample_action_and_response', '_get_next_state', '_rotate_action', '_flip_action',
+           '_augment_board_and_action', '_get_augmentation_types', 'UtilGobang', 'Gobang', 'device']
