@@ -783,6 +783,7 @@ if __name__ == "__main__":
     parser.add_argument('--wandb_name', type=str, default=None, help='wandb run name')
     parser.add_argument('--model-type', type=str, default='default', dest='model_type', help='model architecture type')
     parser.add_argument('--extra-specs', type=str, default='{}', dest='extra_specs', help='extra specifications as JSON string')
+    parser.add_argument('--resume', type=str, default=None, help='path to checkpoint snapshot to resume training from')
     args = parser.parse_args()
 
     # Parse extra_specs from JSON string
@@ -834,6 +835,31 @@ if __name__ == "__main__":
     # 打印模型参数量
     total_params = sum(p.numel() for p in agent.parameters() if p.requires_grad)
     print(f"Total trainable parameters: {total_params}")
+
+    # Load from checkpoint if --resume is provided
+    if args.resume:
+        resume_path = args.resume
+        if not os.path.exists(resume_path):
+            print(f"Warning: Resume path '{resume_path}' does not exist. Starting fresh training.")
+        else:
+            try:
+                # Try to load as pickle first (full model object)
+                if resume_path.endswith('.pkl'):
+                    import pickle
+                    with open(resume_path, 'rb') as f:
+                        agent = pickle.load(f)
+                    agent = agent.to(device)
+                    print(f"Loaded full model from pickle checkpoint: {resume_path}")
+                # Try to load as state dict
+                elif resume_path.endswith('.pth'):
+                    checkpoint = torch.load(resume_path, map_location=device)
+                    agent.load_state_dict(checkpoint)
+                    print(f"Loaded model state dict from checkpoint: {resume_path}")
+                else:
+                    print(f"Unrecognized checkpoint format for '{resume_path}'. Please use .pth or .pkl files.")
+            except Exception as e:
+                print(f"Error loading checkpoint from '{resume_path}': {e}")
+                print("Starting fresh training...")
 
     # 根据模型类型决定保存路径
     from time import strftime, localtime
