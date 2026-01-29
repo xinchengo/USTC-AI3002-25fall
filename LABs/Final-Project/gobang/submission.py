@@ -761,18 +761,22 @@ class GobangModel(nn.Module):
             # Bug 3: Critic Optimizer Step
             self.critic.optimizer.step()
         
-        return actor_loss, critic_loss
+        # Detach losses to prevent memory accumulation
+        return actor_loss.detach(), critic_loss.detach()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='args')
     parser.add_argument('--num_episodes', type=int, help='number of episodes')
     parser.add_argument('--checkpoint', type=int, help='the interval of saving models')
+    parser.add_argument('--board-size', type=int, default=12, help='size of the gobang board (default: 12)')
+    parser.add_argument('--bound', type=int, default=5, help='the bound for winning (default: 5)')
     parser.add_argument('--lr', type=float, default=1e-4, help='learning rate for optimizers (default: 1e-4)')
     parser.add_argument('--gamma', type=float, default=0.5, help='discount factor for training (default: 0.5)')
     parser.add_argument('--reward-type', type=str, default='default', dest='reward_type', 
                         help='reward type: default, heuristic (default: default)')
     parser.add_argument('--algorithm', type=str, default='ac', help='training algorithm: ac (actor-critic), a2c (advantage actor-critic)')
+    # parser.add_argument('--num_envs', type=int, default=1, help='number of parallel environments (default: 1)')
     parser.add_argument('--use_wandb', action='store_true', help='use wandb for experiment tracking (requires wandb installed)')
     parser.add_argument('--wandb_project', type=str, default='gobang-rl-AI3002', help='wandb project name')
     parser.add_argument('--wandb_name', type=str, default=None, help='wandb run name')
@@ -805,8 +809,8 @@ if __name__ == "__main__":
                 config={
                     "num_episodes": num_episodes,
                     "checkpoint": checkpoint,
-                    "board_size": 12,
-                    "bound": 5,
+                    "board_size": args.board_size,
+                    "bound": args.bound,
                     "lr": args.lr,
                     "gamma": args.gamma,
                     "reward_type": args.reward_type,
@@ -824,7 +828,7 @@ if __name__ == "__main__":
         except ImportError:
             pass
         
-    agent = GobangModel(board_size=12, bound=5, model_type=args.model_type, extra_specs=extra_specs, lr=args.lr, algorithm=args.algorithm).to(device)
+    agent = GobangModel(board_size=args.board_size, bound=args.bound, model_type=args.model_type, extra_specs=extra_specs, lr=args.lr, algorithm=args.algorithm).to(device)
     print(f"Model initialized. Model Type: {args.model_type}, Algorithm: {args.algorithm}, Extra Specs: {extra_specs}")
     # 打印模型参数量
     total_params = sum(p.numel() for p in agent.parameters() if p.requires_grad)
