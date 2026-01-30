@@ -832,17 +832,17 @@ class Actor(nn.Module):
 \begin{figure}[H]
     \centering
     \begin{subfigure}{0.32\textwidth}
-        \includegraphics[width=\linewidth]{baseline_cnn_entropy.png}
+        \includegraphics[width=\linewidth]{figures/baseline_cnn_entropy.png}
         \caption{Baseline CNN}
     \end{subfigure}
     \hfill
     \begin{subfigure}{0.32\textwidth}
-        \includegraphics[width=\linewidth]{attention_entropy.png}
+        \includegraphics[width=\linewidth]{figures/attention_entropy.png}
         \caption{Attention Actor}
     \end{subfigure}
     \hfill
     \begin{subfigure}{0.32\textwidth}
-        \includegraphics[width=\linewidth]{transformer_entropy.png}
+        \includegraphics[width=\linewidth]{figures/transformer_entropy.png}
         \caption{Transformer Actor}
     \end{subfigure}
     \caption{三种架构的策略熵变化趋势对比}
@@ -862,17 +862,17 @@ Critic Loss ($L = MSE(R + \gamma Q_{next}, Q_{cur})$) 反映了价值网络对�
 \begin{figure}[H]
     \centering
     \begin{subfigure}{0.32\textwidth}
-        \includegraphics[width=\linewidth]{baseline_cnn_critic_loss.png}
+        \includegraphics[width=\linewidth]{figures/baseline_cnn_critic_loss.png}
         \caption{Baseline CNN}
     \end{subfigure}
     \hfill
     \begin{subfigure}{0.32\textwidth}
-        \includegraphics[width=\linewidth]{attention_critic_loss.png}
+        \includegraphics[width=\linewidth]{figures/attention_critic_loss.png}
         \caption{Attention Actor}
     \end{subfigure}
     \hfill
     \begin{subfigure}{0.32\textwidth}
-        \includegraphics[width=\linewidth]{transformer_critic_loss.png}
+        \includegraphics[width=\linewidth]{figures/transformer_critic_loss.png}
         \caption{Transformer Actor}
     \end{subfigure}
     \caption{三种架构的 Critic Loss 变化趋势对比}
@@ -891,17 +891,17 @@ Actor 的目标是最大化期望回报，代码中体现为最小化 $Loss = -\
 \begin{figure}[H]
     \centering
     \begin{subfigure}{0.32\textwidth}
-        \includegraphics[width=\linewidth]{baseline_cnn_actor_loss.png}
+        \includegraphics[width=\linewidth]{figures/baseline_cnn_actor_loss.png}
         \caption{Baseline CNN}
     \end{subfigure}
     \hfill
     \begin{subfigure}{0.32\textwidth}
-        \includegraphics[width=\linewidth]{attention_actor_loss.png}
+        \includegraphics[width=\linewidth]{figures/attention_actor_loss.png}
         \caption{Attention Actor}
     \end{subfigure}
     \hfill
     \begin{subfigure}{0.32\textwidth}
-        \includegraphics[width=\linewidth]{transformer_actor_loss.png}
+        \includegraphics[width=\linewidth]{figures/transformer_actor_loss.png}
         \caption{Transformer Actor}
     \end{subfigure}
     \caption{三种架构的 Actor Loss 变化趋势对比}
