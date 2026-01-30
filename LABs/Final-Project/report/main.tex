@@ -1,4 +1,4 @@
-\documentclass{ctexart}
+\documentclass[oneside]{ctexbook}
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{amssymb}
@@ -11,6 +11,9 @@
 \usepackage{xcolor}
 \usepackage{subcaption}
 \usepackage{tikz} % 用于绘制模型架构图
+
+\usepackage{geometry}
+\geometry{a4paper, left=1in, right=1in, top=1in, bottom=1in}
 
 % 代码高亮设置
 \lstset{
@@ -27,40 +30,609 @@
 }
 
 \pagestyle{plain} % 页码
-\title{\bf 人工智能与机器学习基础--Final Project 实验报告}
-\author{姓名：\underline{~~~~~~~~~您的姓名~~~~~~~~~}  学号：\underline{~~~~~您的学号~~~~~~} }
+\title{\bf 《人工智能与机器学习基础》\\Final Project 实验报告}
+\author{彭予乐 PB24000365 \\ 李欣宸 PB24000150 \\ 叶盛豪 PB24000227}
 \date{\today}
 
 \begin{document}
 
 \maketitle
 
-\section{实验原理}
+\tableofcontents
 
-本次实验旨在基于深度强化学习（Deep Reinforcement Learning）解决 $12 \times 12$ 棋盘下的五子棋博弈问题。核心原理包含以下三个方面：
+\chapter{Warm-up}
 
-\subsection{二元零和马尔可夫博弈}
+此部分报告讨论 Warm-up 实验结果，关于 Monte Carlo 学习和时序差分学习（Temporal-Difference Learning）的原理将会在第\ref{chap:theory}章中进行详细介绍。
+
+\section{任务 A：Monte Carlo Learning}
+
+\subsection{环境介绍}
+
+Blackjack（21点）环境中，玩家每次可选择HIT（要牌）或STICK（停牌），HIT时随机抽取1-K或A，点数超过21则输（-1奖励）。双方都STICK后点数高者胜（+1奖励）。
+状态由三元组 (Player Sum, Dealer Showing, Usable Ace) 表示，Dealer Showing为庄家明牌，Usable Ace和No Usable Ace是状态参量，指当前手上是否有一张目前被用作11点的Ace可以变成1点以避免爆掉。Player Sum是玩家当前手牌点数总和。
+\subsection{不同训练轮数下的价值函数和策略可视化}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/first_visit_comparison_ace.png}
+    \caption{First-visit MC: Usable Ace价值函数演化}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/first_visit_comparison_no_ace.png}
+    \caption{First-visit MC: No Usable Ace价值函数演化}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/first_visit_policy_comparison_ace.png}
+    \caption{First-visit MC: Usable Ace策略演化（红色=STICK，绿色=HIT）}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/first_visit_policy_comparison_no_ace.png}
+    \caption{First-visit MC: No Usable Ace策略演化（红色=STICK，绿色=HIT）}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/first_visit_differences_ace.png}
+    \caption{First-visit MC: Usable Ace价值函数变化}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/first_visit_differences_no_ace.png}
+    \caption{First-visit MC: No Usable Ace价值函数变化}
+\end{figure}
+
+\subsubsection{收敛特点}
+
+\textbf{Usable Ace在Player sum < 11时价值函数完全为0：}玩家不可能到达Player sum < 11且Usable Ace的状态，因此这部分状态的价值函数从未更新。
+
+\textbf{No Usable Ace在Player sum = 11处出现明显尖峰：}当玩家点数为11且没有Usable Ace时，这是一个关键决策点。在此之前，要牌不会导致爆牌，并且总和越接近21越有可能获胜，因此价值函数逐渐递增；在11以后，要牌有较高风险（抽到10或以上就会爆牌），但停牌的点数又相对较低，致使价值函数陡然下降。由于这个状态的决策复杂性和风险性，其价值估计会表现出较大的波动和相对较高的值，在3D图中形成尖峰。
+
+
+\subsubsection{方差来源}
+
+价值函数估计中的方差主要来自：(1) $\epsilon$-greedy探索导致的随机动作选择；(2) 环境发牌的随机性；(3) Monte Carlo方法的有限采样。
+
+\subsection{First-visit MC vs Every-visit MC}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/every_visit_comparison_ace.png}
+    \caption{Every-visit MC: Usable Ace价值函数演化}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{figures/every_visit_comparison_no_ace.png}
+    \caption{Every-visit MC: No Usable Ace价值函数演化}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/every_visit_policy_comparison_ace.png}
+        \caption{Usable Ace策略演化}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/every_visit_policy_comparison_no_ace.png}
+        \caption{No Usable Ace策略演化}
+    \end{subfigure}
+    \caption{Every-visit MC策略演化对比}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/every_visit_differences_ace.png}
+        \caption{Usable Ace价值函数变化}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/every_visit_differences_no_ace.png}
+        \caption{No Usable Ace价值函数变化}
+    \end{subfigure}
+    \caption{Every-visit MC价值函数变化对比}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\textwidth]{figures/combined_convergence_metrics.png}
+    \caption{收敛性能对比（4个子图分别展示Mean/Max/Std Value及Mean Change，每个子图包含4条曲线：Every-visit/First-visit × Ace/No-Ace）}
+\end{figure}
+
+\subsubsection{学习曲线对比}
+
+该图展示了以下重要现象：
+
+\textbf{1. Mean Value对比——Every-visit初期更低的原因：}
+
+对于\textbf{Usable Ace}情况，前期Every-visit MC的mean value function显著低于First-visit MC（而方差更小），并逐渐追平到同一收敛值。这一现象的深层原因是：
+
+\begin{itemize}
+    \item 当策略尚未成熟时，大多数episode都会以失败告终（输掉游戏），因此返回的累积奖励多为负值。
+    \item 在Usable Ace的episode中，由于Ace的灵活性，某些状态可能会被多次访问（例如玩家在持有Ace的情况下反复要牌）。First-visit MC只在首次访问时更新一次，而Every-visit MC会在每次访问时都进行更新。
+    \item 这意味着Every-visit MC对同一状态的更新次数更多，相当于使用了更大的“有效学习率”。
+    \item 在训练初期，这种“更大的学习率”会使得负面结果（失败）更快地反映到价值估计中，导致mean value function下降更快。
+    \item 随着策略逐渐成熟，成功率提高，两种方法最终收敛到相同的最优价值。
+\end{itemize}
+
+对于No Usable Ace情况，两者的mean value function几乎完全重合，这是因为在No Usable Ace情况下一组$(s,a)$不可能在同一回合中到达两次（因为点数只能增加不能减少），Every-visit实际等价于First-visit。
+
+\textbf{2. 标准差分析：}在No Usable Ace情况下，标准差在$5\times10^5$轮时已完全趋于稳定（约0.48），说明value function estimates已基本收敛，此时剩余方差主要来自不同状态真实价值的结构性差异，而非Monte Carlo估计噪声。而Usable Ace的标准差仍在下降（在0.4以下），可见由于Ace导致的问题复杂度、随机性和建模难度升高，No Usable Ace比Usable Ace收敛更慢。
+
+总体而言，Every-visit MC在训练初期（前10,000轮左右）的平均价值和最大价值变化更快，表现出更激进的学习特征。这是因为Every-visit MC在每次访问状态时都会更新价值函数，利用了更多的信息。而First-visit MC仅在首次访问状态时进行更新，信息利用较少，学习过程更为保守。
+
+\subsubsection{稳定性分析}
+
+Every-visit MC和First-visit MC在Blackjack环境中表现出的差异并不显著。但仔细观察可以发现，在训练后期（200,000轮之后），First-visit MC的Mean Change指标（价值函数变化幅度）略小于Every-visit MC，说明First-visit MC在该环境下可能略微更稳定一些。这可能是因为First-visit MC每个回合中对同一状态只更新一次（首次访问），减少了对同一状态的多次更新，从而降低了方差。
+
+\section{任务 B：Temporal-Difference Learning}
+
+\subsection{环境介绍}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.45\textwidth]{figures/CliffWalkingGame.png}
+\end{figure}
+
+Cliff Walking是4×12网格世界，起点左下，终点右下，底部中间为悬崖。智能体每步可选上下左右，最短路径13步（先向上一步，然后向右11步，再向下一步）。每步-1奖励，掉入悬崖-100奖励并回到起点。
+
+\subsection{SARSA vs Q-Learning}
+
+\subsubsection{训练曲线对比}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/episode_stats_sarsa_length.png}
+        \caption{SARSA回合长度}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/episode_stats_q_learning_length.png}
+        \caption{Q-Learning回合长度}
+    \end{subfigure}
+    
+    \vspace{0.3cm}
+    
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/episode_stats_sarsa_reward.png}
+        \caption{SARSA累积奖励}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/episode_stats_q_learning_reward.png}
+        \caption{Q-Learning累积奖励}
+    \end{subfigure}
+    \caption{SARSA与Q-Learning训练曲线对比}
+\end{figure}
+
+\subsubsection{收敛特点：“安全” vs “激进”}
+
+通过对比训练曲线，我们可以观察到两种算法的显著差异：
+
+\paragraph{SARSA：安全策略}
+\begin{itemize}
+    \item 收敛后的奖励曲线更加稳定，波动较小
+    \item 最终学到的策略更加保守，倾向于选择安全路径
+    \item 回合长度的众数为 15-17 步，略高于理论最短路径（13步）
+    \item 这说明 SARSA 学到的策略会主动避开悬崖边缘，选择绕路的安全策略
+\end{itemize}
+
+\paragraph{Q-Learning：激进策略}
+\begin{itemize}
+    \item 收敛后仍然存在较为明显的波动和噪声
+    \item 时常出现尖锐的负奖励峰值，说明智能体偶尔会掉入悬崖
+    \item 回合长度的众数约为 13 步，即理论最短路径
+    \item 这说明 Q-Learning 学到的策略更加激进，倾向于紧贴悬崖边缘行走以获得最短路径
+\end{itemize}
+
+\paragraph{原因分析}
+
+这种差异的根本原因在于两种算法的更新机制不同：
+
+\begin{itemize}
+    \item \textbf{SARSA (On-policy)}：在价值估计时考虑了当前策略的实际行为。由于使用 $\epsilon$-greedy 策略进行探索，智能体有一定概率选择随机动作。在靠近悬崖的状态下，如果随机动作导致掉入悬崖（-100奖励），这个风险会被反映到价值估计中。因此，SARSA 对这些危险状态的价值估计会更加保守，最终学到的策略倾向于避开风险，选择远离悬崖的安全路径以获得相对更高的 on-policy 价值估计。
+    
+    \item \textbf{Q-Learning (Off-policy)}：在价值估计时使用贪心策略（$\max$ 操作），不考虑探索带来的风险。它估计的是在“完美执行最优策略”情况下的价值。因此，Q-Learning 认为紧贴悬崖边缘的路径是最优的（因为步数最少），即使在实际执行中由于 $\epsilon$-greedy 探索可能会掉入悬崖。这种理想化的价值估计导致 Q-Learning 学到的策略更加激进，偏好最短路径，从而在测试时获得更高的预期回报（假设不进行探索）。
+\end{itemize}
+
+这个例子很好地展示了 on-policy 和 off-policy 算法在风险敏感环境中的不同行为特征。
+
+\subsection{Double Q-Learning vs Q-Learning}
+
+在Q-Learning与SARSA的对比中，已经提到Q-Learning存在价值高估问题。这是因为在更新时使用 $\max$ 操作，当存在噪声时，$\max$ 操作会倾向于选择被高估的动作价值，从而导致价值函数的系统性高估。
+
+Double Q-Learning 通过维护两个独立的 Q 函数（$Q_1$ 和 $Q_2$）来缓解这个问题：
+\begin{itemize}
+    \item 随机选择一个 Q 函数（假设为 $Q_1$）
+    \item 使用 $Q_1$ 选择动作：$a^* = \arg\max_a Q_1(s',a)$
+    \item 使用 $Q_2$ 评估该动作的价值：$Q_1(s,a) \leftarrow Q_1(s,a) + \alpha[r + \gamma Q_2(s',a^*) - Q_1(s,a)]$
+\end{itemize}
+
+这样可以避免用同一个 Q 函数既选择又评估动作，从而减轻高估问题。
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/q_learning_rewards_comparison.png}
+        \caption{回合奖励对比}
+        \label{fig:rewards_comparison}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.49\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{figures/q_learning_qvalue_overestimation.png}
+        \caption{Q值高估问题}
+        \label{fig:qvalue_overestimation}
+    \end{subfigure}
+    \caption{Q-Learning vs Double Q-Learning对比}
+\end{figure}
+
+图\ref{fig:qvalue_overestimation}清晰展示了价值高估问题： Q-Learning 的平均 Q 值趋向 -16，明显高于 Double Q-Learning 趋向的 -32。这将会造成策略不稳定，因为智能体会倾向于选择那些被高估的动作，导致训练过程中屡次失败终止的剧烈震荡。
+从图\ref{fig:rewards_comparison}可以看出，Double Q-Learning的训练曲线更加平滑稳定，而 Q-Learning时常出现尖锐抖动；与此同时，Double Q-Learning 能够比 Q-Learning 达到略微更高的平均回合奖励。
+
+
+通过对比实验，我们可以得出以下结论：
+
+\paragraph{稳定性改善}
+Double Q-Learning 明显优于 Q-Learning，前者有效缓解了后者在训练后期出现剧烈震荡的问题，训练过程更加稳定。在Cliff Walking环境中，Q-Learning由于价值高估使得策略不稳定，智能体可能选择实际上次优的动作，导致训练曲线波动。
+
+\paragraph{价值高估缓解}
+Q-Learning 的平均 Q 值比 Double Q-Learning 高出相当一部分（约50\%），说明 Q-Learning 存在较为严重的价值高估问题。而 Double Q-Learning 通过引入两个独立的 Q 表，将动作选择和动作评估分离，有效减轻了这一问题。
+
+\paragraph{理论验证}
+本实验很好地验证了 Double Q-Learning 论文中提出的理论：通过解耦动作选择和价值评估，可以显著降低 Q-Learning 中由于 $\max$ 操作导致的系统性高估。这种改进在实践中具有重要意义，特别是在状态空间较大、噪声较多的环境中。
+
+\chapter{实验原理} \label{chap:theory}
+
+本次实验旨在基于深度强化学习（Deep Reinforcement Learning）解决 $12 \times 12$ 棋盘下的五子棋博弈问题。我们首先简要需要介绍一些强化学习的基本原理以及该实验的原理\footnote{部分由报告的其中一位作者李欣宸的博客中翻译整理，链接：https://xinchengo.github.io/blog-zh/2025/12/29/强化学习记/}。
+
+\section{强化学习基础}
+\subsection{马尔可夫决策过程}
+
+\begin{equation}
+(\mathcal S, \mathcal A, P, r, \gamma)
+\end{equation}
+
+\textbf{蒙特卡洛学习（Monte-Carlo Learning）}是价值函数上的直接 Robbins--Monro 随机逼近，其更新过程如下：
+
+\begin{gather}
+G_t \;\triangleq\; \sum_{k=0}^{T-t-1} \gamma^k \, r_{t+k+1},\\
+V(s_t) \;\leftarrow\; V(s_t) + \alpha_t\bigl(G_t - V(s_t)\bigr).
+\end{gather}
+
+其中 $G_t$ 为从时刻 $t$ 开始到回合终止（终止时刻为 $T$）的折扣回报，$\alpha_t$ 为步长（例如 First/Every-visit MC 常取 $\alpha_t=1/N(s_t)$ 对应样本均值的增量更新）。
+
+
+
+\subsection{Bellman 算子}
+
+\textbf{Bellman 期望算子：}
+
+\begin{gather}
+(\mathcal T^\pi V)(s)
+=
+\mathbb E_{a\sim\pi(\cdot\mid s)}
+\left[
+r(s,a)
++
+\gamma
+\mathbb E_{s^\prime\sim P(\cdot\mid s,a)} V(s^\prime)
+\right],\\
+(\mathcal T^\pi Q)(s,a)
+=
+r(s,a)
++
+\gamma
+\mathbb E_{s'\sim P(\cdot\mid s,a)}
+\mathbb E_{a'\sim\pi(\cdot\mid s')}
+Q(s',a').
+\end{gather}
+
+\textbf{Bellman 最优算子：}
+
+\begin{gather}
+(\mathcal T^\ast V)(s)
+=
+\max_{a\in\mathcal A}
+\left[
+r(s,a)
++
+\gamma
+\mathbb E_{s'\sim P(\cdot\mid s,a)} V(s')
+\right],\\
+(\mathcal T^\ast Q)(s,a)
+=
+r(s,a)
++
+\gamma
+\mathbb E_{s'\sim P(\cdot\mid s,a)}
+\max_{a'} Q(s',a').
+\end{gather}
+
+当 $\gamma \in (0,1)$ 时，有以下性质成立：
+
+\begin{itemize}
+\item $\mathcal T^{\pi}$ 与 $\mathcal T^{\ast}$ 在 $\|\cdot\|_\infty$ 范数下是 $\gamma$-\textbf{收缩映射}
+\item 二者均存在唯一的 \textbf{不动点}：
+\[
+V^{\pi} = \mathcal T^{\pi} V^{\pi}, 
+\qquad
+V^{\ast} = \mathcal T^{\ast} V^{\ast},
+\]
+其存在性与唯一性由 Banach 不动点定理保证
+\end{itemize}
+
+\subsection{值函数方法简介}
+
+最优值函数满足：
+
+\begin{equation}
+V^{\ast} = \mathcal T^{\ast} V^{\ast},
+\qquad
+\text{或}
+\qquad
+Q^{\ast} = \mathcal T^{\ast} Q^{\ast}.
+\end{equation}
+
+由于 $\mathcal T^\ast$ 是一个收缩映射，迭代过程
+
+\begin{equation}
+V_{k+1} = \mathcal T^{\ast} V_k
+\end{equation}
+是收敛的，这一过程被称为 \textbf{值迭代（Value Iteration）}。
+然而，在无模型（model-free）的设定中，状态转移概率 $P$ 下的期望是不可获得的，这就促使我们使用随机逼近方法。
+
+\subsubsection{Q-learning}
+
+Robbins--Monro 随机逼近提供了一种求解“期望形式根方程”的方法。
+假设存在函数 $M(\theta)$ 和常数 $\alpha$，使得方程
+
+\begin{equation}
+M(\theta) = \alpha
+\end{equation}
+
+在 $\theta^\ast$ 处存在唯一解。
+我们无法直接观测 $M(\theta)$，但可以获得随机变量 $N(\theta)$ 的样本，其中
+
+\begin{equation}
+\mathbb E[N(\theta)] = M(\theta).
+\end{equation}
+
+该算法的基本形式为：
+
+\begin{equation}
+\theta_{n+1}
+\gets
+\theta_n - a_n \bigl(N(\theta_n) - \alpha \bigr).
+\end{equation}
+
+当步长序列满足
+
+\begin{equation}
+\sum_{n=0}^\infty a_n = \infty,
+\qquad
+\sum_{n=0}^\infty a_n^2 < \infty,
+\end{equation}
+
+并且 $N(\theta), M(\theta)$ 具有良好的性质时，$\theta_n$ 保证收敛。
+
+将 Robbins--Monro 随机逼近应用于不动点方程
+
+\begin{equation}
+Q^\ast = \mathcal T^\ast Q^\ast,
+\end{equation}
+
+即可得到：
+
+\begin{equation}
+Q_{t+1}(s_t,a_t)
+\gets
+Q_t(s_t,a_t)
++
+\alpha_t
+\Bigl[
+r_{t+1}
++
+\gamma \max_{a^\prime} Q_t(s_{t+1},a^\prime)
+-
+Q_t(s_t,a_t)
+\Bigr].
+\end{equation}
+
+这正是 \textbf{Q-learning} 算法。
+
+\subsubsection{SARSA}
+
+SARSA 是一种 \textbf{on-policy 的时序差分（TD）控制} 方法，它直接学习动作价值函数 $Q(s,a)$。
+在采用 $\epsilon$-greedy 等带探索的行为策略 $\pi$ 采样轨迹时，SARSA 的一步更新为：
+
+\begin{equation}
+Q(s_t,a_t)
+\gets
+Q(s_t,a_t)
++
+\alpha_t
+\Bigl[
+r_{t+1}
++
+\gamma Q(s_{t+1},a_{t+1})
+-
+Q(s_t,a_t)
+\Bigr].
+\end{equation}
+
+其中 $a_{t+1} \sim \pi(\cdot\mid s_{t+1})$ 是 \emph{按当前行为策略实际选择} 的下一步动作，因此 SARSA 会将探索带来的风险一并纳入价值估计。
+
+\subsection{策略方法简介}
+
+\textbf{策略迭代（Policy Iteration）}比值迭代更加微妙，它包含两个基于 Bellman 的步骤：
+
+\begin{gather}
+\begin{aligned}
+\text{策略评估：}\quad
+& V^{\pi_k} = \mathcal T^{\pi_k} V^{\pi_k}, \\
+\text{策略改进：}\quad
+&
+\begin{aligned}
+\pi_{k+1}(s)
+&=
+\arg\max_a
+\left[
+r(s,a)
++
+\gamma
+\mathbb E_{s^\prime} V^{\pi_k}(s^\prime)
+\right] \\
+&=
+\arg\max_a Q^{\pi_k}(s,a),
+\end{aligned}
+\\
+\implies\quad
+& \mathcal T^{\pi_{k+1}} V^{\pi_k}
+=
+\mathcal T^{\ast} V^{\pi_k}.
+\end{aligned}
+\end{gather}
+
+策略方法通常可以分为两类：
+
+\begin{itemize}
+\item 模仿 \emph{软化} 或 \emph{近似} 策略迭代的方法，例如 Actor--Critic；
+\item 直接优化目标函数 $J(\theta)$ 的方法，即策略梯度方法。
+\end{itemize}
+
+当动作空间较大或连续时，策略方法往往更加合适。
+
+当策略不是由显式存储的 $Q(s,a)$ 导出，而是由参数 $\theta$ 参数化时，策略改进步骤可重写为：
+
+\begin{equation}
+\pi_{k+1}
+\approx
+\arg\max_{\pi \in \Pi_\theta}
+\mathbb E_{a\sim\pi}
+\bigl[
+Q^{\pi_k}(s,a)
+\bigr].
+\end{equation}
+
+在固定评论员（critic）$Q^{\pi_k}$ 的情况下，定义目标函数：
+
+\begin{equation}
+J(\theta)
+=
+\mathbb E_{s\sim d^{\pi_k}}
+\mathbb E_{a\sim \pi_\theta(\cdot\mid s)}
+\bigl[
+Q^{\pi_k}(s,a)
+\bigr].
+\end{equation}
+
+该目标函数的推导依赖于状态分布 $d^{\pi_k}$，因此在实践中是难以直接处理的。
+然而，\textbf{策略梯度定理（Policy Gradient Theorem）} 利用轨迹分布的马尔可夫结构，避免了对状态分布求导：
+
+\begin{equation}
+\nabla_\theta J(\theta)
+=
+\mathbb E
+\left[
+\nabla_\theta \log \pi_\theta(a\mid s)
+\,
+Q^{\pi_k}(s,a)
+\right].
+\end{equation}
+
+这为策略改进提供了一种可行的近似方式。
+
+\subsubsection{Actor-Critic 方法}
+
+由策略梯度定理
+\(
+\nabla_\theta J(\theta)=\mathbb E\bigl[\nabla_\theta\log\pi_\theta(a_t\mid s_t)\,Q^{\pi}(s_t,a_t)\bigr]
+\)
+可见，关键在于获得 $Q^{\pi}(s,a)$ 的估计。
+\textbf{朴素 Actor-Critic} 的做法是：Actor 用参数 $\theta$ 表示策略 $\pi_\theta(a\mid s)$；Critic 用参数 $\omega$ 近似动作价值函数 $Q_\omega(s,a)\approx Q^{\pi}(s,a)$，并用 TD 方法在线更新该估计。
+
+\paragraph{Critic：用 TD 学习 $Q$}
+在按当前策略采样得到 $(s_t,a_t,r_{t+1},s_{t+1},a_{t+1})$ 后，Critic 的一步 TD 误差可写为
+\begin{equation}
+\delta_t \;\triangleq\; r_{t+1}+\gamma Q_\omega(s_{t+1},a_{t+1})-Q_\omega(s_t,a_t).
+\end{equation}
+并通过最小化 $\frac{1}{2}\delta_t^2$（或等价的梯度下降）来更新 $\omega$，使 $Q_\omega$ 逐步逼近 $Q^{\pi}$。
+
+\paragraph{Actor：用 $Q$ 作权重的策略梯度}
+获得 $Q_\omega$ 后，Actor 的更新可写为
+\begin{equation}
+\theta \leftarrow \theta + \alpha_\pi\, Q_\omega(s_t,a_t)\,\nabla_\theta\log\pi_\theta(a_t\mid s_t).
+\end{equation}
+该算法直接对应策略梯度定理，但在实践中往往需要进一步的方差控制（见下节 A2C）。
+
+\subsubsection{A2C 算法}
+
+A2C（Advantage Actor-Critic）在朴素 Actor-Critic 的基础上引入 \textbf{优势函数（Advantage）} 来替代 $Q^{\pi}(s,a)$ 进入策略梯度，从而在不改变期望梯度方向的前提下降低方差、提升稳定性。
+
+\paragraph{优势估计}
+优势定义为
+\begin{equation}
+A^{\pi}(s_t,a_t) \;\triangleq\; Q^{\pi}(s_t,a_t)-V^{\pi}(s_t),
+\end{equation}
+其中 $V^{\pi}(s)$ 可视为策略梯度中的基线（baseline）。实践中常用 $n$ 步回报（bootstrapping）来构造优势估计：
+\begin{gather}
+\hat R_t^{(n)} \;\triangleq\; \sum_{k=0}^{n-1}\gamma^k r_{t+k+1} + \gamma^n V_\omega(s_{t+n}),\\
+\hat A_t \;\triangleq\; \hat R_t^{(n)} - V_\omega(s_t).
+\end{gather}
+当 $n=1$ 时，$\hat A_t$ 退化为一步 TD 误差 $\delta_t$；当 $n$ 增大时，回报更接近 Monte-Carlo，偏差减小但方差可能增大。
+
+\paragraph{优化目标（简洁写法）}
+Actor 的损失通常写作
+\begin{equation}
+\mathcal L_{\text{actor}} = -\,\mathbb E\bigl[\log\pi_\theta(a_t\mid s_t)\,\hat A_t\bigr],
+\end{equation}
+Critic 则拟合 $\hat R_t^{(n)}$：
+\begin{equation}
+\mathcal L_{\text{critic}} = \frac{1}{2}\,\mathbb E\bigl[\bigl(\hat R_t^{(n)}-V_\omega(s_t)\bigr)^2\bigr].
+\end{equation}
+为鼓励探索，也常在 $\mathcal L_{\text{actor}}$ 中加入熵正则项 $-\beta\,\mathbb E[\mathcal H(\pi_\theta(\cdot\mid s_t))]$。
+
+\section{二元零和马尔可夫博弈}
 五子棋属于二元零和马尔可夫博弈（Binary Zero-Sum Markov Games）。
 \begin{itemize}
     \item \textbf{二元零和}：博弈双方黑棋与白棋的利益完全对立，一方的收益即为另一方的损失（$+100$ vs $-100$）。
     \item \textbf{马尔可夫性}：当前棋盘状态 $S_t$ 包含了决策所需的所有历史信息，未来的状态 $S_{t+1}$ 仅取决于当前状态 $S_t$ 和动作 $A_t$。
 \end{itemize}
 
-\subsection{Naive Self Play}
+\section{Naive Self Play}
 由于缺乏外部专家数据，我们采用朴素自我博弈（Naive Self Play）机制。Agent 在每一轮中分别扮演黑棋和白棋，通过左右互搏来生成训练数据。虽然该方法理论上不保证收敛至纳什均衡，但在实践中能有效探索状态空间并提升策略强度。
 
-\subsection{Actor-Critic 架构}
+\section{Actor-Critic 架构}
 模型采用 Actor-Critic 架构以兼顾策略灵活性与训练稳定性：
 \begin{itemize}
     \item \textbf{Actor (策略网络 $\pi_\theta$)}：输入状态 $S$，输出动作的概率分布。本次实验重点探索了 Transformer 架构在此处的应用。
     \item \textbf{Critic (价值网络 $V_\omega$)}：输入状态 $S$及动作 $A$，评估当前局面的优劣Q值，计算 TD Error 以指导 Actor 更新。
 \end{itemize}
 
-\section{模型设计}
+\chapter{模型设计}
 
 
 
-\section{约束策略分析}
+\chapter{约束策略分析}
 
 五子棋规则要求落子必须在空位。模型输出必须满足 \textbf{Constrained Policy}：
 1. 非法位置概率为 0。
@@ -81,7 +653,7 @@ output_probs = torch.softmax(logits, dim=1)
 \end{lstlisting}
 这种处理保证了数值稳定性（避免了 $\log(0)$），并严格约束了输出空间。
 
-\section{Bug 修复}
+\chapter{Bug 修复}
 
 在 \texttt{optimize} 函数中修复了三个关键 Bug：
 
@@ -105,7 +677,9 @@ output_probs = torch.softmax(logits, dim=1)
     \end{itemize}
 \end{enumerate}
 
-\section{其他问题记录}
+\chapter{其他问题记录}
+
+\section{语法上的问题}
 
 \begin{itemize}
     \item \textbf{张量形状匹配 (Shape Matching)}：
@@ -113,13 +687,40 @@ output_probs = torch.softmax(logits, dim=1)
     
     \item \textbf{In-place 操作报错}：
     PyTorch 自动微分禁止对叶子节点进行原地修改。在处理 Masking 时，避免了 \texttt{logits[mask] = -inf} 的写法，改用非原地操作 \texttt{masked\_fill}。
+    
+    \item \textbf{内存泄漏问题}：
+    在 \texttt{optimize} 函数返回 loss 时，若不进行 \texttt{.detach()} 操作，会导致计算图持续累积，造成内存泄漏。修复方式为在返回前对损失值调用 \texttt{.detach()}，即 \texttt{return actor\_loss.detach(), critic\_loss.detach()}。
 \end{itemize}
 
-\section{疑难点：关于 Transformer 模型的思考与实验分析}
+\section{项目结构演化}
+
+为了本实验的开展，本小组的成员对项目框架进行了大量的重构和修改：
+
+\begin{itemize}
+    \item 比如，该代码中的 \verb|tkinter| 类难以在远程服务器上运行，我们将其换成了 \verb|gobang| 目录下的 \verb|tests.human_play| 模块，使用命令行界面实现人机交互（模块化设计见下文）
+    \item 原有代码中的 \verb|evaluate.py| 仅能实现两个相同类型模型的对战（因为其直接尝试从主文件中导入模型类，再加载 \verb|.pth| 权重）；为了支持更多异构模型的训练，我们改用了更加面向对象的设计，在 \verb|wrappers/| 文件夹中实现了 \verb|BaseWrapper| 抽象类作为模型之间的通用接口，再在其基础之上构造了 \verb|RandomWrapper|、\verb|CheckpointWrapper| 等类；\footnote{该实验作者本希望使用该接口实现自己训练模型和网络上一些已知较强模型的对战，但是鉴于模型优化困难以及时间原因，最终未能实现该目标。}
+    \item 新建了 \verb|tests| 文件夹，并在文件夹中实现了 \verb|evaluate|、\verb|human_play| 等脚本，这些脚本通过加载不同的 \verb|Wrapper| 实现两个模型间对弈和与人类对战的功能。
+\end{itemize}]
+
+当前，代码的结构如下所示：
+
+\begin{itemize}
+    \item \texttt{submission.py}: 训练脚本
+    \item \texttt{utils.py}: 环境、Actor-Critic 算法细节
+    \item \texttt{checkpoints/}: 训练结果保存目录
+    \item \texttt{wrappers/}: 模型/环境适配器（\texttt{BaseWrapper} 等），统一评估接口。
+    \item \texttt{experiments/}: 实验方案与记录（虽然最后没有怎么用上该文件夹）
+    \item \texttt{tests/}: 测试脚本（对战、人机交互等）
+\end{itemize}
+
+此外，我们增加了模型架构的可配置性，在执行训练脚本，可以通过命令行参数灵活切换 CNN/Transformer 以及不同的超参数配置（具体见 \verb|submission.py| 中的 \verb|--extra_specs| 参数）。这样的设计极大地方便了我们进行对比实验和调参。
+
+
+\chapter{疑难点：关于 Transformer 模型的思考与实验分析}
 
 在本次实验中，我们引入了基于 Transformer 的 Actor 架构，旨在解决 CNN 在处理五子棋全局依赖时的局限性。为了验证该架构的有效性并确定最佳模型版本，我们进行了一系列严谨的对比实验。
 
-\subsection{Transformer 与 Baseline CNN 的性能对比}
+\section{Transformer 与 Baseline CNN 的性能对比}
 
 首先，我们将 Transformer 模型与 Baseline CNN 模型进行了直接对抗。实验数据（表 \ref{tab:trans_vs_cnn}）揭示了 Transformer 架构的巨大潜力。
 
@@ -143,7 +744,7 @@ CNN (2k)         & \textbf{Transformer (8.5k)} & 0.8\%  & \textbf{99.2\%} \\ \bo
     \item \textbf{后期碾压（8500轮）：} 经过充分训练的 Transformer 模型（\texttt{model\_8499}）展现了统治级的表现。当执白后手时，它对战 CNN 的胜率高达 \textbf{99.2\%}，几乎未尝一败；即便是执黑先行，也取得了 \textbf{87.3\%} 的压倒性胜利。这有力地证明了 Transformer 架构在捕捉棋盘全局特征和长程策略上的优越性。
 \end{enumerate}
 
-\subsection{最优模型遴选：为何选择 8499 版本？}
+\section{最优模型遴选：为何选择 8499 版本？}
 
 在 Transformer 的训练过程中（共 10000 轮），我们发现模型性能并非线性增长，而是存在震荡。通过内部对抗赛，我们最终锁定了第 8500 轮的检查点（\texttt{model\_8499.pkl}）为最优版本。
 
@@ -171,10 +772,10 @@ CNN (2k)         & \textbf{Transformer (8.5k)} & 0.8\%  & \textbf{99.2\%} \\ \bo
     \item \textbf{局部最优的确认：} 8499 相比于之前的 7999 版本也有显著提升（双向胜率均大幅领先）。虽然在与 4999 版本的对比中互有胜负（数据略），但考虑到 8499 在面对后续迭代版本（9499/9999）时展现出的极强鲁棒性，我们认为它代表了本次训练过程中的\textbf{性能峰值}。
 \end{enumerate}
 
-\section{模型优化与架构创新}
+\chapter{模型优化与架构创新}
 为了突破传统 CNN 在捕捉全局棋型依赖上的局限性，本实验设计了基于 Self-Attention 的 Transformer Actor。
 
-\subsection{核心代码实现}
+\section{核心代码实现}
 在 \texttt{submission.py} 中，\texttt{Actor} 类的关键实现如下：
 
 \begin{lstlisting}[language=Python, caption=Transformer Actor 初始化与前向传播]
@@ -213,19 +814,19 @@ class Actor(nn.Module):
         return torch.softmax(logits, dim=1)
 \end{lstlisting}
 
-\subsection{设计动机}
+\section{设计动机}
 \begin{itemize}
     \item \textbf{全局视野}：传统 CNN 受限于卷积核大小，难以直接关联棋盘远端的棋子。Transformer 利用 Self-Attention 机制，使棋盘上任意两个位置的 Token 都能直接交互，从而捕捉“大局观”。
     \item \textbf{位置编码}：由于 Self-Attention 具有排列不变性，必须引入 Positional Encoding 以保留二维棋盘的空间结构信息。
 \end{itemize}
 
-\subsection{曲线分析}
+\section{曲线分析}
 
 为了探索不同神经网络架构在棋盘博弈任务中的表现差异，我们分别实现了基于卷积神经网络（Baseline CNN）、注意力机制（Attention Actor）和纯 Transformer 架构的模型，并进行了长时间的训练对比。
 
 以下是针对三种核心指标（Entropy、Critic Loss、Actor Loss）的详细对比分析。
 
-\subsubsection{策略熵 (Entropy) 演变对比}
+\subsection{策略熵 (Entropy) 演变对比}
 策略熵反映了模型动作分布的随机性，是衡量“探索（Exploration）”与“利用（Exploitation）”平衡的关键指标。
 
 \begin{figure}[H]
@@ -255,7 +856,7 @@ class Actor(nn.Module):
     \item \textbf{Transformer Actor}（右图）：熵值呈现出缓慢且平稳的下降趋势，在整个 10000 轮训练中始终维持在 0 以上。这意味着 Transformer 始终保持着一定的探索能力，这种“持续探索”的特性是其最终在胜率上超越 CNN 的关键原因。
 \end{itemize}
 
-\subsubsection{价值网络损失 (Critic Loss) 对比}
+\subsection{价值网络损失 (Critic Loss) 对比}
 Critic Loss ($L = MSE(R + \gamma Q_{next}, Q_{cur})$) 反映了价值网络对自己预测准确性的评估。
 
 \begin{figure}[H]
@@ -284,7 +885,7 @@ Critic Loss ($L = MSE(R + \gamma Q_{next}, Q_{cur})$) 反映了价值网络对�
     \item \textbf{Transformer Actor}：Critic Loss 在训练后期仍保持一定的波动。这是良性的信号：由于 Transformer Actor 持续探索新动作，Critic 不断被迫面对分布外（Out-of-Distribution）的新局面，从而推动价值网络不断修正和学习，最终获得更鲁棒的全局估值能力。
 \end{itemize}
 
-\subsubsection{策略网络损失 (Actor Loss) 对比}
+\subsection{策略网络损失 (Actor Loss) 对比}
 Actor 的目标是最大化期望回报，代码中体现为最小化 $Loss = -\text{mean}(\log \pi(a|s) \cdot Q(s,a))$。
 
 \begin{figure}[H]
@@ -313,7 +914,7 @@ Actor 的目标是最大化期望回报，代码中体现为最小化 $Loss = -\
     \item \textbf{Transformer Actor}：Loss 曲线呈现出有节奏的震荡。结合 Transformer 最终 99\% 的胜率来看，这种震荡并非训练失败，而是策略在高维空间中不断调整优化方向的表现。相比于 CNN 的“固步自封”，Transformer 在不断尝试寻找更优的梯度方向。
 \end{itemize}
 
-\subsubsection{总结}
+\subsection{总结}
 通过上述三组曲线的对比，我们可以得出结论：在小样本、零和博弈的强化学习任务中，\textbf{避免过早收敛}是提升最终性能的关键。虽然 Baseline CNN 训练曲线看起来平滑、收敛快，但其性能上限被锁死；而 \textbf{Transformer} 凭借其架构天然的低归纳偏置（Inductive Bias），虽然训练过程看起来高熵、高 Loss 波动，但最终学会了更复杂的全局策略，实现了性能的反超。
 
 \end{document}
