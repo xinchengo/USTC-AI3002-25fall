@@ -38,11 +38,103 @@
 
 \maketitle
 
+\frontmatter  % 前言部分，页码使用罗马数字
+
+\chapter{前言}
+
+\section{实验环境搭建}
+
+由于本次实验由三位小组成员共同完成，且每位成员的计算机系统配置情况存在差异，以下内容仅供参考
+
+\subsection{软件环境}
+
+\paragraph{核心依赖库：}
+\begin{itemize}
+    \item \textbf{Python}：3.10.x - 3.12.x
+    \item \textbf{PyTorch}：2.0.0+cu118 或更高版本
+\end{itemize}
+
+\paragraph{数据处理与可视化：}
+\begin{itemize}
+    \item \textbf{NumPy}：1.24+ （数组操作与数值计算）
+    \item \textbf{Matplotlib}：3.7+ （绘图与可视化）
+    \item \textbf{Gymnasium}：0.29+ （强化学习环境，Warm-up 部分使用）
+\end{itemize}
+
+\paragraph{加速与实验跟踪（可选）：}
+\begin{itemize}
+    \item \textbf{Numba}：0.58+ （JIT 编译加速 Python 代码，用于棋盘势能计算）
+    \item \textbf{Weights \& Biases}：0.16+ （实验追踪与可视化，通过 \texttt{--use\_wandb} 启用）
+\end{itemize}
+
+\section{小组分工}
+
+本次实验由三位成员共同完成，具体分工如下：
+
+\subsection{彭予乐 (PB24000365)}
+\begin{itemize}
+    \item \textbf{主要负责}：Warm-up 部分实验实现与分析
+    \begin{itemize}
+        \item Monte Carlo Learning (First-visit \& Every-visit MC) 算法实现
+        \item Temporal-Difference Learning (SARSA, Q-Learning, Double Q-Learning) 算法实现
+        \item 实验曲线绘制与对比分析
+    \end{itemize}
+    \item \textbf{协助工作}：Final Project 模型训练与超参数调优
+    \item \textbf{报告撰写}：Warm-up 部分全部内容（第 \ref{chap:warmup} 章）
+\end{itemize}
+
+\subsection{李欣宸 (PB24000150)}
+\begin{itemize}
+    \item \textbf{主要负责}：Final Project 框架修改和参数优化
+    \item \textbf{项目工程化}：
+    \begin{itemize}
+        \item 项目结构重构（Wrappers、Tests 模块设计）
+        \item 命令行参数系统（argparse）完善
+    \end{itemize}
+    \item \textbf{报告撰写}：
+    \begin{itemize}
+        \item 实验原理-强化学习基础（第 \ref{sec:rl_basics} 节）
+        \item 模型设计（第 \ref{chap:model} 章）
+        \item 其他问题记录-项目结构演化（第 \ref{sec:project-structure} 节）
+        \item 约束策略分析扩充（第 \ref{chap:constrained_policy_analysis} 章）
+        \item 思考题（第 \ref{chap:questions} 章）
+        \item 课程反馈（第 \ref{chap:feedback} 章）
+    \end{itemize}
+\end{itemize}
+
+\subsection{叶盛豪 (PB24000227)}
+\begin{itemize}
+    \item \textbf{主要负责}：Final Project 架构优化与实验分析
+    \item \textbf{数据分析}：
+    \begin{itemize}
+        \item 训练曲线分析（Entropy / Actor Loss / Critic Loss）
+        \item 模型对战评估与胜率统计
+        \item 最优模型遴选（model\_8499 vs model\_9999 等）
+    \end{itemize}
+    \item \textbf{报告撰写}：
+    \begin{itemize}
+        \item 实验原理-后续部分（第 \ref{sec:bzs_mg}, \ref{sec:naive_self_play}, \ref{sec:actor_critic_architecture} 节）
+        \item 约束策略分析初稿（第 \ref{chap:constrained_policy_analysis} 章）
+        \item Bug 修复记录（第 \ref{chap:bug_fixes} 章）
+        \item 其他问题记录-语法上的问题（第 \ref{sec:syntax_issues} 节）
+        \item 关于模型架构的章节（第 \ref{chap:transformer_analysis}, \ref{chap:curve_analysis} ,\ref{chap:model_optimization} 章）
+    \end{itemize}
+\end{itemize}
+
+\subsection{协作完成部分}
+\begin{itemize}
+    \item 整体实验方案设计与技术路线讨论
+    \item 代码审查与问题调试
+    \item 报告最终审校
+\end{itemize}
+
 \tableofcontents
 
-\chapter{Warm-up}
+\mainmatter  % 正文部分，页码使用阿拉伯数字
 
-此部分报告讨论 Warm-up 实验结果，关于 Monte Carlo 学习和时序差分学习（Temporal-Difference Learning）的原理将会在第\ref{chap:theory}章中进行详细介绍。
+\chapter{Warm-up} \label{chap:warmup}
+
+此部分报告讨论 Warm-up 实验结果，关于 Monte Carlo 学习和时序差分学习（Temporal-Difference Learning）的原理将会在第\ref{sec:rl_basics}节中进行详细介绍。
 
 \section{任务 A：Monte Carlo Learning}
 
@@ -304,7 +396,7 @@ Q-Learning 的平均 Q 值比 Double Q-Learning 高出相当一部分（约50\%�
 
 本次实验旨在基于深度强化学习（Deep Reinforcement Learning）解决 $12 \times 12$ 棋盘下的五子棋博弈问题。我们首先简要需要介绍一些强化学习的基本原理以及该实验的原理\footnote{部分由报告的其中一位作者李欣宸的博客中翻译整理，链接：https://xinchengo.github.io/blog-zh/2025/12/29/强化学习记/}。
 
-\section{强化学习基础}
+\section{强化学习基础} \label{sec:rl_basics}
 \subsection{马尔可夫决策过程}
 
 \begin{equation}
@@ -611,24 +703,24 @@ Critic 则拟合 $\hat R_t^{(n)}$：
 \end{equation}
 为鼓励探索，也常在 $\mathcal L_{\text{actor}}$ 中加入熵正则项 $-\beta\,\mathbb E[\mathcal H(\pi_\theta(\cdot\mid s_t))]$。
 
-\section{二元零和马尔可夫博弈}
+\section{二元零和马尔可夫博弈} \label{sec:bzs_mg}
 五子棋属于二元零和马尔可夫博弈（Binary Zero-Sum Markov Games）。
 \begin{itemize}
     \item \textbf{二元零和}：博弈双方黑棋与白棋的利益完全对立，一方的收益即为另一方的损失（$+100$ vs $-100$）。
     \item \textbf{马尔可夫性}：当前棋盘状态 $S_t$ 包含了决策所需的所有历史信息，未来的状态 $S_{t+1}$ 仅取决于当前状态 $S_t$ 和动作 $A_t$。
 \end{itemize}
 
-\section{Naive Self Play}
+\section{Naive Self Play} \label{sec:naive_self_play}
 由于缺乏外部专家数据，我们采用朴素自我博弈（Naive Self Play）机制。Agent 在每一轮中分别扮演黑棋和白棋，通过左右互搏来生成训练数据。虽然该方法理论上不保证收敛至纳什均衡，但在实践中能有效探索状态空间并提升策略强度。
 
-\section{Actor-Critic 架构}
+\section{Actor-Critic 架构} \label{sec:actor_critic_architecture}
 模型采用 Actor-Critic 架构以兼顾策略灵活性与训练稳定性：
 \begin{itemize}
     \item \textbf{Actor (策略网络 $\pi_\theta$)}：输入状态 $S$，输出动作的概率分布。本次实验重点探索了 Transformer 架构在此处的应用。
     \item \textbf{Critic (价值网络 $V_\omega$)}：输入状态 $S$及动作 $A$，评估当前局面的优劣Q值，计算 TD Error 以指导 Actor 更新。
 \end{itemize}
 
-\chapter{模型设计}
+\chapter{模型设计} \label{chap:model}
 
 本章详细介绍 Actor 与 Critic 网络的架构设计。
 
@@ -818,7 +910,7 @@ q_values_all = self.fc(out)  # (B, N*N)
     \item \textbf{简洁高效}：这是最朴素的方法，易于实现且计算开销小。
 \end{itemize}
 
-\chapter{约束策略分析}
+\chapter{约束策略分析} \label{chap:constrained_policy_analysis}
 
 五子棋规则要求落子必须在空位。模型输出必须满足 \textbf{Constrained Policy}（约束策略）的两个核心要求：
 \begin{enumerate}
@@ -954,7 +1046,7 @@ output_probs = output_probs / output_probs.sum(dim=1, keepdim=True)  # 重归一
     \item 代码不够优雅，容易出错。
 \end{itemize}
 
-\chapter{Bug 修复}
+\chapter{Bug 修复} \label{chap:bug_fixes}
 
 在 \texttt{optimize} 函数中修复了三个关键 Bug：
 
@@ -980,7 +1072,7 @@ output_probs = output_probs / output_probs.sum(dim=1, keepdim=True)  # 重归一
 
 \chapter{其他问题记录}
 
-\section{语法上的问题}
+\section{语法上的问题} \label{sec:syntax_issues}
 
 \begin{itemize}
     \item \textbf{张量形状匹配 (Shape Matching)}：
@@ -993,7 +1085,7 @@ output_probs = output_probs / output_probs.sum(dim=1, keepdim=True)  # 重归一
     在 \texttt{optimize} 函数返回 loss 时，若不进行 \texttt{.detach()} 操作，会导致计算图持续累积，造成内存泄漏。修复方式为在返回前对损失值调用 \texttt{.detach()}，即 \texttt{return actor\_loss.detach(), critic\_loss.detach()}。
 \end{itemize}
 
-\section{项目结构演化}
+\section{项目结构演化} \label{sec:project-structure}
 
 为了本实验的开展，本小组的成员对项目框架进行了大量的重构和修改：
 
@@ -1017,7 +1109,7 @@ output_probs = output_probs / output_probs.sum(dim=1, keepdim=True)  # 重归一
 此外，我们增加了模型架构的可配置性，在执行训练脚本，可以通过命令行参数灵活切换 CNN/Transformer 以及不同的超参数配置（具体见 \verb|submission.py| 中的 \verb|--extra_specs| 参数）。这样的设计极大地方便了我们进行对比实验和调参。
 
 
-\chapter{疑难点：关于 Transformer 模型的思考与实验分析}
+\chapter{疑难点：关于 Transformer 模型的思考与实验分析} \label{chap:transformer_analysis}
 
 在本次实验中，我们引入了基于 Transformer 的 Actor 架构，旨在解决 CNN 在处理五子棋全局依赖时的局限性。为了验证该架构的有效性并确定最佳模型版本，我们进行了一系列严谨的对比实验。
 
@@ -1073,7 +1165,7 @@ CNN (2k)         & \textbf{Transformer (8.5k)} & 0.8\%  & \textbf{99.2\%} \\ \bo
     \item \textbf{局部最优的确认：} 8499 相比于之前的 7999 版本也有显著提升（双向胜率均大幅领先）。虽然在与 4999 版本的对比中互有胜负（数据略），但考虑到 8499 在面对后续迭代版本（9499/9999）时展现出的极强鲁棒性，我们认为它代表了本次训练过程中的\textbf{性能峰值}。
 \end{enumerate}
 
-\chapter{曲线分析}
+\chapter{曲线分析} \label{chap:curve_analysis}
 
 为了探索不同神经网络架构在棋盘博弈任务中的表现差异，我们分别实现了基于卷积神经网络（Baseline CNN）、注意力机制（Attention Actor）和纯 Transformer 架构的模型，并进行了长时间的训练对比。
 
@@ -1170,10 +1262,13 @@ Actor 的目标是最大化期望回报，代码中体现为最小化 $Loss = -\
 \section{总结}
 通过上述三组曲线的对比，我们可以得出结论：在小样本、零和博弈的强化学习任务中，\textbf{避免过早收敛}是提升最终性能的关键。虽然 Baseline CNN 训练曲线看起来平滑、收敛快，但其性能上限被锁死；而 \textbf{Transformer} 凭借其架构天然的低归纳偏置（Inductive Bias），虽然训练过程看起来高熵、高 Loss 波动，但最终学会了更复杂的全局策略，实现了性能的反超。
 
-\chapter{模型优化与架构创新}
+\chapter{模型优化与架构创新} \label{chap:model_optimization}
+
+\section{Transformer Actor 设计}
+
 为了突破传统 CNN 在捕捉全局棋型依赖上的局限性，本实验设计了基于 Self-Attention 的 Transformer Actor。
 
-\section{核心代码实现}
+\subsection{核心代码实现}
 在 \texttt{submission.py} 中，\texttt{Actor} 类的关键实现如下：
 
 \begin{lstlisting}[language=Python, caption=Transformer Actor 初始化与前向传播]
@@ -1212,13 +1307,13 @@ class Actor(nn.Module):
         return torch.softmax(logits, dim=1)
 \end{lstlisting}
 
-\section{设计动机}
+\subsection{设计动机}
 \begin{itemize}
     \item \textbf{全局视野}：传统 CNN 受限于卷积核大小，难以直接关联棋盘远端的棋子。Transformer 利用 Self-Attention 机制，使棋盘上任意两个位置的 Token 都能直接交互，从而捕捉“大局观”。
     \item \textbf{位置编码}：由于 Self-Attention 具有排列不变性，必须引入 Positional Encoding 以保留二维棋盘的空间结构信息。
 \end{itemize}
 
-\chapter{思考题}
+\chapter{思考题} \label{chap:questions}
 
 \section{问题陈述}
 
@@ -1280,7 +1375,7 @@ Actor-Critic 本质上是基于策略梯度的局部优化方法。即使收敛�
     \item \textbf{循环现象}：Transformer Actor 的 Entropy 和 Loss 曲线（图 \ref{fig:entropy_comparison}、\ref{fig:actor_loss_comparison}）有时表现出突然上升到很高，然后再下降的现象，暗示策略可能刚跳出某个局部最优，又陷入另一个局部最优，而不是稳定下降到纳什均衡。
 \end{enumerate}
 
-\chapter{课程反馈}
+\chapter{课程反馈} \label{chap:feedback}
 
 \section{对课程及实验的建议}
 
