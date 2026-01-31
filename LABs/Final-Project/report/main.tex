@@ -630,28 +630,329 @@ Critic 则拟合 $\hat R_t^{(n)}$：
 
 \chapter{模型设计}
 
+本章详细介绍 Actor 与 Critic 网络的架构设计。
 
+\section{Actor 网络设计}
+
+Actor 网络负责生成动作概率分布 $\pi_\theta(a\mid s)$。我们实现了三种主要架构：CNN、Attention 和 Transformer。
+
+\subsection{模型初始化关键代码}
+
+\subsubsection{CNN 架构}
+
+\begin{lstlisting}[language=Python]
+# CNN Actor: 堆叠卷积层提取棋盘局部特征
+depth = self.extra_specs.get('depth', 4)
+channels = self.extra_specs.get('channels', 64)
+use_batch_norm = self.extra_specs.get('batch_norm', False)
+
+layers = []
+in_channels = 1
+
+for i in range(depth):
+    out_channels = channels
+    layers.append(nn.Conv2d(in_channels, out_channels, 
+                           kernel_size=3, padding=1))
+    if use_batch_norm:
+        layers.append(nn.BatchNorm2d(out_channels))
+    layers.append(nn.ReLU())
+    in_channels = out_channels
+
+self.conv_blocks = nn.Sequential(*layers)
+flat_features = channels * board_size * board_size
+self.fc = nn.Linear(flat_features, board_size * board_size)
+\end{lstlisting}
+
+\textbf{设计动机：}
+\begin{itemize}
+    \item \textbf{局部特征提取}：卷积核能够有效捕获棋盘上的局部棋型（如连子、跳子等）。
+    \item \textbf{参数共享}：相同的卷积核在整个棋盘上滑动，减少参数量并增强泛化能力。
+    \item \textbf{可调深度与宽度}：通过 \texttt{depth} 和 \texttt{channels} 超参数控制模型容量，平衡表达能力与训练效率。
+    \item \textbf{Batch Normalization}：可选的 BN 层稳定训练过程，加速收敛。
+\end{itemize}
+
+\subsubsection{Transformer 架构}
+
+\begin{lstlisting}[language=Python]
+# Transformer Actor: 全局自注意力机制
+embed_dim = self.extra_specs.get('embed_dim', 64)
+num_heads = self.extra_specs.get('num_heads', 4)
+num_layers = self.extra_specs.get('num_layers', 2)
+
+# Input Embedding: 将棋盘嵌入到高维空间
+self.embedding = nn.Sequential(
+    nn.Conv2d(1, embed_dim, kernel_size=3, padding=1),
+    nn.ReLU()
+)
+
+# 位置编码: 为序列注入位置信息
+self.pos_encoder = PositionalEncoding(embed_dim, 
+                                     max_len=board_size*board_size)
+
+# Transformer Encoder Stack
+encoder_layer = nn.TransformerEncoderLayer(
+    d_model=embed_dim, 
+    nhead=num_heads, 
+    batch_first=True
+)
+self.transformer_encoder = nn.TransformerEncoder(
+    encoder_layer, 
+    num_layers=num_layers
+)
+
+# 输出头: 为每个位置生成 logit
+self.output_head = nn.Linear(embed_dim, 1)
+\end{lstlisting}
+
+\textbf{设计动机：}
+\begin{itemize}
+    \item \textbf{全局依赖建模}：Self-Attention 机制允许每个位置直接与棋盘上所有其他位置交互，捕获长距离的战略关联（如双头攻击、威胁与防守）。
+    \item \textbf{位置编码}：由于 Transformer 本身不具备位置感知能力，通过正弦位置编码为每个位置注入空间信息。
+    \item \textbf{可扩展性}：通过增加 \texttt{num\_layers} 和 \texttt{embed\_dim} 可以显著提升模型的表达能力，适合复杂博弈场景。
+\end{itemize}
+
+\subsection{Forward 方法关键代码}
+
+\begin{lstlisting}[language=Python]
+def forward(self, x: np.ndarray):
+    # 统一输入格式为 (B, 1, N, N)
+    input_board = output.clone()
+    batch_size = output.size(0)
+    
+    if self.model_type == "cnn":
+        # CNN 前向传播
+        out = self.conv_blocks(output)
+        out = out.view(out.size(0), -1)  # 展平为 (B, C*N*N)
+        logits = self.fc(out)  # 生成 logits: (B, N*N)
+    
+    elif self.model_type == "transformer":
+        # Embedding: (B, 1, N, N) -> (B, Embed, N, N)
+        features = self.embedding(output)
+        # Flatten to sequence: (B, N*N, Embed)
+        features = features.view(batch_size, features.size(1), -1)
+                          .permute(0, 2, 1)
+        # 位置编码
+        features = self.pos_encoder(features)
+        # Transformer 编码
+        features = self.transformer_encoder(features)
+        # 输出: (B, N*N, 1) -> (B, N*N)
+        logits = self.output_head(features).squeeze(-1)
+    
+    # *** 约束策略处理（见下节） ***
+    flat_board = input_board.view(batch_size, -1)
+    illegal_mask = (flat_board != 0)  # 非空位置为非法
+    logits = logits.masked_fill(illegal_mask, -1e9)
+    output_probs = torch.softmax(logits, dim=1)
+    
+    return output_probs
+\end{lstlisting}
+
+\section{Critic 网络设计}
+
+Critic 网络估计状态-动作对的 Q 值 $Q_\omega(s, a)$。关键挑战在于如何将动作信息 $a$ 注入到网络中。
+
+\subsection{动作注入策略}
+
+我们实现了三种动作注入方式（\texttt{action\_injection}）：
+
+\begin{enumerate}
+    \item \textbf{Early Injection}：将动作作为额外通道拼接到输入棋盘上。
+    \item \textbf{Late Injection}：在最后一个卷积层之前将动作 mask 拼接到特征图上。
+    \item \textbf{FC Injection}：在全连接层将动作坐标归一化后拼接到展平特征上。
+\end{enumerate}
+
+\subsection{Late Injection 关键代码}
+
+\begin{lstlisting}[language=Python]
+# Late Injection: 在最后一层卷积前注入动作信息
+elif self.action_injection == "late":
+    layers_list = list(self.conv_blocks)
+    # 找到最后一个 Conv2d 层
+    last_conv_idx = -1
+    for i in range(len(layers_list) - 1, -1, -1):
+        if isinstance(layers_list[i], nn.Conv2d):
+            last_conv_idx = i
+            break
+    
+    # 前向传播到倒数第二层
+    for i in range(last_conv_idx):
+        output = layers_list[i](output)
+    
+    # 创建动作 mask: (B, 1, N, N)，在动作位置标记为 1
+    action_mask = torch.zeros(batch_size, 1, 
+                             self.board_size, self.board_size).to(device)
+    for j, (ax, ay) in enumerate(action_tensor):
+        action_mask[j, 0, int(ax), int(ay)] = 1.0
+    
+    # 拼接特征与动作 mask
+    output = torch.cat([output, action_mask], dim=1)
+    
+    # 继续最后一层卷积及后续层
+    for i in range(last_conv_idx, len(layers_list)):
+        output = layers_list[i](output)
+\end{lstlisting}
+
+\textbf{设计动机：}
+\begin{itemize}
+    \item \textbf{特征融合}：在高层特征上注入动作信息，使网络能够结合已提取的棋盘语义特征与具体动作位置，更准确地评估 Q 值。
+    \item \textbf{空间定位}：相比把动作作为二维数值特征，将其转换为与棋盘同尺寸的 mask，有助于网络更直观地理解动作在棋盘上的位置关系。
+    \item \textbf{适配 Backbone}：该方法适用于 Actor 和 Critic 共享骨架的情况，动作在 Critic 头处进行注入。
+\end{itemize}
+
+\subsection{FC Injection 关键代码}
+
+\begin{lstlisting}[language=Python]
+# FC Injection: 在全连接层拼接归一化的动作坐标
+if self.action_injection == "fc":
+    # 归一化动作坐标到 [0, 1]
+    action_coords = action_tensor / self.board_size
+    # 拼接到展平特征: (B, features) + (B, 2) -> (B, features+2)
+    out = torch.cat([out, action_coords], dim=1)
+
+# 全连接层输出所有位置的 Q 值
+q_values_all = self.fc(out)  # (B, N*N)
+\end{lstlisting}
+
+\textbf{设计动机：}
+\begin{itemize}
+    \item \textbf{简洁高效}：这是最朴素的方法，易于实现且计算开销小。
+\end{itemize}
 
 \chapter{约束策略分析}
 
-五子棋规则要求落子必须在空位。模型输出必须满足 \textbf{Constrained Policy}：
-1. 非法位置概率为 0。
-2. 合法位置概率和为 1。
+五子棋规则要求落子必须在空位。模型输出必须满足 \textbf{Constrained Policy}（约束策略）的两个核心要求：
+\begin{enumerate}
+    \item \textbf{0 限制（Zero Constraint）}：非法位置（已有棋子的位置）的动作概率必须严格为 0。
+    \item \textbf{归一限制（Normalization Constraint）}：所有合法位置的动作概率之和必须为 1。
+\end{enumerate}
 
-我们在 \texttt{forward} 中通过 Masking 技术实现：
+\section{Forward 部分的约束实现}
+
+我们在 Actor 的 \texttt{forward} 方法中通过 \textbf{Masking + Softmax} 技术优雅地解决了这两个约束：
+
 \begin{lstlisting}[language=Python]
-# 1. 创建非法动作掩码 (非0处即有子)
-flat_board = input_board.view(batch_size, -1)
-illegal_mask = (flat_board != 0)
+# 保留原始棋盘用于创建掩码
+input_board = output.clone()
+batch_size = output.size(0)
 
-# 2. Logits 掩码填充
-# 使用 -1e9 而非 0，因为 exp(0)=1 会导致概率不为0
+# ... (模型前向传播，生成 logits) ...
+
+# ========== 约束策略处理 ==========
+# 步骤 1: 创建非法动作掩码
+# 将棋盘展平为 (B, N*N)，非 0 位置表示已有棋子（非法）
+flat_board = input_board.view(batch_size, -1)
+illegal_mask = (flat_board != 0)  # (B, N*N) 布尔张量
+
+# 步骤 2: Logits 掩码填充
+# 将非法位置的 logit 设为极小值 -1e9
 logits = logits.masked_fill(illegal_mask, -1e9)
 
-# 3. Softmax 归一化
+# 步骤 3: Softmax 归一化
+# 自动满足归一化约束，且非法位置概率趋近于 0
+output_probs = torch.softmax(logits, dim=1)
+
+return output_probs
+\end{lstlisting}
+
+\section{如何解决 0 限制}
+
+\subsection{技术原理}
+
+\textbf{问题：}如何保证非法位置的概率严格为 0？
+
+\textbf{解决方案：}利用 Softmax 函数的数学性质。
+
+Softmax 定义为：
+\begin{equation}
+p_i = \frac{e^{z_i}}{\sum_{j=1}^{N^2} e^{z_j}},
+\end{equation}
+其中 $z_i$ 是位置 $i$ 的 logit。
+
+当 $z_i \to -\infty$ 时：
+\begin{equation}
+p_i = \frac{e^{-\infty}}{\sum_j e^{z_j}} = \frac{0}{\text{正数}} = 0.
+\end{equation}
+
+在实践中，我们使用 $-10^9$ 作为"负无穷"的数值近似。此时：
+\begin{equation}
+e^{-10^9} \approx 10^{-4.3 \times 10^8} \approx 0 \quad (\text{在浮点精度下}).
+\end{equation}
+
+\subsection{为什么不直接设为 0？}
+
+\textbf{错误做法：}
+\begin{lstlisting}[language=Python]
+# 错误！会导致数值问题
+logits[illegal_mask] = 0  # In-place 操作还会破坏梯度
 output_probs = torch.softmax(logits, dim=1)
 \end{lstlisting}
-这种处理保证了数值稳定性（避免了 $\log(0)$），并严格约束了输出空间。
+
+\textbf{问题分析：}
+\begin{enumerate}
+    \item \textbf{概率非零}：$e^0 = 1$，非法位置的概率为 $\frac{1}{\sum_j e^{z_j}}$，并非 0。
+    \item \textbf{梯度破坏}：In-place 操作会导致 PyTorch 自动微分失败。
+    \item \textbf{归一化失效}：非法位置"占用"了部分概率质量，导致合法位置概率偏低。
+\end{enumerate}
+
+\textbf{正确做法：}使用 \texttt{masked\_fill} 非原地操作，填充极小值：
+\begin{lstlisting}[language=Python]
+logits = logits.masked_fill(illegal_mask, -1e9)  # 非原地操作
+\end{lstlisting}
+
+\section{如何解决归一限制}
+
+\subsection{Softmax 的归一化性质}
+
+Softmax 函数天然满足归一化约束：
+\begin{equation}
+\sum_{i=1}^{N^2} p_i = \sum_{i=1}^{N^2} \frac{e^{z_i}}{\sum_{j=1}^{N^2} e^{z_j}} = \frac{\sum_{i=1}^{N^2} e^{z_i}}{\sum_{j=1}^{N^2} e^{z_j}} = 1.
+\end{equation}
+
+由于非法位置的 $e^{z_i} \approx 0$，实际效果等价于：
+\begin{equation}
+\sum_{i \in \text{Legal}} p_i \approx 1, \quad p_i = 0 \; (\forall i \in \text{Illegal}).
+\end{equation}
+
+\subsection{数值稳定性保证}
+
+PyTorch 的 \texttt{torch.softmax} 实现了数值稳定的版本：
+\begin{equation}
+p_i = \frac{e^{z_i - z_{\max}}}{\sum_j e^{z_j - z_{\max}}},
+\end{equation}
+其中 $z_{\max} = \max_j z_j$。这避免了指数运算溢出（当 $z_i$ 很大时 $e^{z_i}$ 会溢出）。
+
+即使非法位置的 logit 为 $-10^9$，由于减去 $z_{\max}$ 后仍然是极小值，不会引起数值问题。
+
+\section{与其他方法的对比}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{方法} & \textbf{0 限制} & \textbf{归一限制} \\
+\midrule
+直接设 logits = 0 & $\times$ (概率 $\neq$ 0) & $\times$ (和 $\neq$ 1) \\
+后处理置 0 + 重归一化 & $\checkmark$ & $\checkmark$ \\
+Masking + Softmax (本方法) & $\checkmark$ & $\checkmark$ \\
+\bottomrule
+\end{tabular}
+\caption{不同约束策略方法对比}
+\end{table}
+
+\textbf{后处理方法示例：}
+\begin{lstlisting}[language=Python]
+# 可行但不优雅的方法
+output_probs = torch.softmax(logits, dim=1)
+output_probs[illegal_mask] = 0  # 置 0（破坏梯度！）
+output_probs = output_probs / output_probs.sum(dim=1, keepdim=True)  # 重归一化
+\end{lstlisting}
+
+\textbf{缺点：}
+\begin{itemize}
+    \item 破坏计算图，导致梯度无法正确传播到非法位置的 logits。
+    \item 需要额外的归一化步骤，增加计算开销。
+    \item 代码不够优雅，容易出错。
+\end{itemize}
 
 \chapter{Bug 修复}
 
@@ -772,6 +1073,103 @@ CNN (2k)         & \textbf{Transformer (8.5k)} & 0.8\%  & \textbf{99.2\%} \\ \bo
     \item \textbf{局部最优的确认：} 8499 相比于之前的 7999 版本也有显著提升（双向胜率均大幅领先）。虽然在与 4999 版本的对比中互有胜负（数据略），但考虑到 8499 在面对后续迭代版本（9499/9999）时展现出的极强鲁棒性，我们认为它代表了本次训练过程中的\textbf{性能峰值}。
 \end{enumerate}
 
+\chapter{曲线分析}
+
+为了探索不同神经网络架构在棋盘博弈任务中的表现差异，我们分别实现了基于卷积神经网络（Baseline CNN）、注意力机制（Attention Actor）和纯 Transformer 架构的模型，并进行了长时间的训练对比。
+
+以下是针对三种核心指标（Entropy、Critic Loss、Actor Loss）的详细对比分析。
+
+\section{策略熵 (Entropy) 演变对比}
+策略熵反映了模型动作分布的随机性，是衡量“探索（Exploration）”与“利用（Exploitation）”平衡的关键指标。
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{0.32\textwidth}
+        \includegraphics[width=\linewidth]{figures/baseline_cnn_entropy.png}
+        \caption{Baseline CNN}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.32\textwidth}
+        \includegraphics[width=\linewidth]{figures/attention_entropy.png}
+        \caption{Attention Actor}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.32\textwidth}
+        \includegraphics[width=\linewidth]{figures/transformer_entropy.png}
+        \caption{Transformer Actor}
+    \end{subfigure}
+    \caption{三种架构的策略熵变化趋势对比}
+    \label{fig:entropy_comparison}
+\end{figure}
+
+\textbf{分析：}
+\begin{itemize}
+    \item \textbf{Baseline CNN}（左图）：熵值在训练初期（约前 1000 episodes）迅速坍塌至 0 附近。这表明模型极快地陷入了确定性策略，虽然收敛速度快，但也意味着它可能过早地放弃了对更优策略的探索（Premature Convergence）。
+    \item \textbf{Attention Actor}（中图）：熵值表现出极大的震荡性，且经常出现异常尖峰。这说明单纯在 CNN 后附加 Attention 层可能引入了训练的不稳定性，导致策略分布难以稳定收敛。
+    \item \textbf{Transformer Actor}（右图）：熵值呈现出缓慢且平稳的下降趋势，在整个 10000 轮训练中始终维持在 0 以上。这意味着 Transformer 始终保持着一定的探索能力，这种“持续探索”的特性是其最终在胜率上超越 CNN 的关键原因。
+\end{itemize}
+
+\section{价值网络损失 (Critic Loss) 对比}
+Critic Loss ($L = MSE(R + \gamma Q_{next}, Q_{cur})$) 反映了价值网络对自己预测准确性的评估。
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{0.32\textwidth}
+        \includegraphics[width=\linewidth]{figures/baseline_cnn_critic_loss.png}
+        \caption{Baseline CNN}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.32\textwidth}
+        \includegraphics[width=\linewidth]{figures/attention_critic_loss.png}
+        \caption{Attention Actor}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.32\textwidth}
+        \includegraphics[width=\linewidth]{figures/transformer_critic_loss.png}
+        \caption{Transformer Actor}
+    \end{subfigure}
+    \caption{三种架构的 Critic Loss 变化趋势对比}
+    \label{fig:critic_loss_comparison}
+\end{figure}
+
+\textbf{分析：}
+\begin{itemize}
+    \item \textbf{Baseline CNN}：Critic Loss 迅速降低并保持在极低水平。这与熵的快速坍塌一致——由于 Actor 总是走“老路”，Critic 面对的状态非常单一，因此很容易“猜对”价值，但这是一种虚假的“准确”。
+    \item \textbf{Transformer Actor}：Critic Loss 在训练后期仍保持一定的波动。这是良性的信号：由于 Transformer Actor 持续探索新动作，Critic 不断被迫面对分布外（Out-of-Distribution）的新局面，从而推动价值网络不断修正和学习，最终获得更鲁棒的全局估值能力。
+\end{itemize}
+
+\section{策略网络损失 (Actor Loss) 对比}
+Actor 的目标是最大化期望回报，代码中体现为最小化 $Loss = -\text{mean}(\log \pi(a|s) \cdot Q(s,a))$。
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{0.32\textwidth}
+        \includegraphics[width=\linewidth]{figures/baseline_cnn_actor_loss.png}
+        \caption{Baseline CNN}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.32\textwidth}
+        \includegraphics[width=\linewidth]{figures/attention_actor_loss.png}
+        \caption{Attention Actor}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}{0.32\textwidth}
+        \includegraphics[width=\linewidth]{figures/transformer_actor_loss.png}
+        \caption{Transformer Actor}
+    \end{subfigure}
+    \caption{三种架构的 Actor Loss 变化趋势对比}
+    \label{fig:actor_loss_comparison}
+\end{figure}
+
+\textbf{分析：}
+\begin{itemize}
+    \item \textbf{Baseline CNN}：Actor Loss 曲线非常平滑且趋近于 0，再次印证了其策略的单一性。
+    \item \textbf{Transformer Actor}：Loss 曲线呈现出有节奏的震荡。结合 Transformer 最终 99\% 的胜率来看，这种震荡并非训练失败，而是策略在高维空间中不断调整优化方向的表现。相比于 CNN 的“固步自封”，Transformer 在不断尝试寻找更优的梯度方向。
+\end{itemize}
+
+\section{总结}
+通过上述三组曲线的对比，我们可以得出结论：在小样本、零和博弈的强化学习任务中，\textbf{避免过早收敛}是提升最终性能的关键。虽然 Baseline CNN 训练曲线看起来平滑、收敛快，但其性能上限被锁死；而 \textbf{Transformer} 凭借其架构天然的低归纳偏置（Inductive Bias），虽然训练过程看起来高熵、高 Loss 波动，但最终学会了更复杂的全局策略，实现了性能的反超。
+
 \chapter{模型优化与架构创新}
 为了突破传统 CNN 在捕捉全局棋型依赖上的局限性，本实验设计了基于 Self-Attention 的 Transformer Actor。
 
@@ -820,101 +1218,96 @@ class Actor(nn.Module):
     \item \textbf{位置编码}：由于 Self-Attention 具有排列不变性，必须引入 Positional Encoding 以保留二维棋盘的空间结构信息。
 \end{itemize}
 
-\section{曲线分析}
+\chapter{思考题}
 
-为了探索不同神经网络架构在棋盘博弈任务中的表现差异，我们分别实现了基于卷积神经网络（Baseline CNN）、注意力机制（Attention Actor）和纯 Transformer 架构的模型，并进行了长时间的训练对比。
+\section{问题陈述}
 
-以下是针对三种核心指标（Entropy、Critic Loss、Actor Loss）的详细对比分析。
+若模型权重收敛至 Actor/Critic Loss 最优点，黑白双方策略是否一定达成纳什均衡（Nash Equilibrium）？为什么？
 
-\subsection{策略熵 (Entropy) 演变对比}
-策略熵反映了模型动作分布的随机性，是衡量“探索（Exploration）”与“利用（Exploitation）”平衡的关键指标。
+\textbf{结论：}即使模型完全收敛至训练损失的最优点，黑白双方策略也\textbf{不一定}达成纳什均衡。
 
-\begin{figure}[H]
-    \centering
-    \begin{subfigure}{0.32\textwidth}
-        \includegraphics[width=\linewidth]{figures/baseline_cnn_entropy.png}
-        \caption{Baseline CNN}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}{0.32\textwidth}
-        \includegraphics[width=\linewidth]{figures/attention_entropy.png}
-        \caption{Attention Actor}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}{0.32\textwidth}
-        \includegraphics[width=\linewidth]{figures/transformer_entropy.png}
-        \caption{Transformer Actor}
-    \end{subfigure}
-    \caption{三种架构的策略熵变化趋势对比}
-    \label{fig:entropy_comparison}
-\end{figure}
+\section{理论分析}
 
-\textbf{分析：}
+首先要澄清的一点是，五子棋是一项先手必胜的游戏，其纳什均衡的结果是先手必胜。因此，若双方均为理性玩家，纳什均衡策略应当使得先手方获胜。
+
+但是，由于 Actor 和 Critic 的表达能力有限，即使它们能够达到\textbf{在模型参数空间内}的最优点，也不一定能实现纳什均衡策略。由我们的实验结果可见，模型的表达能力远没有到能够体现五子棋“先手必胜”性质的程度，所以我们接下来的分析均建立在对于“一般二人零和博弈”的前提上。
+
+\subsection{纳什均衡的定义}
+
+在二人零和博弈中，策略对 $(\pi_1^*, \pi_2^*)$ 构成纳什均衡当且仅当：
+\begin{equation}
+\begin{cases}
+\pi_1^* = \arg\max_{\pi_1} V(\pi_1, \pi_2^*), \\
+\pi_2^* = \arg\max_{\pi_2} V(\pi_2, \pi_1^*),
+\end{cases}
+\end{equation}
+其中 $V(\pi_i, \pi_j)$ 是玩家 $i$ 在策略组合 $(\pi_i, \pi_j)$ 下的期望收益。
+
+换言之，双方策略必须\textbf{互为最优反应（Best Response）}：给定对手策略，自己无法通过单方面改变策略获得更高收益。
+
+\subsection{Naive Self-Play 的训练目标}
+
+本实验采用的 Naive Self-Play 机制中，Actor-Critic 优化的目标是：
+\begin{gather}
+\mathcal{L}_{\text{actor}} = -\mathbb{E}_{s,a \sim \pi_\theta}\bigl[\log\pi_\theta(a|s) \cdot Q_\omega(s,a)\bigr], \\
+\mathcal{L}_{\text{critic}} = \mathbb{E}\bigl[\bigl(r + \gamma \max_{a'} Q_\omega(s',a') - Q_\omega(s,a)\bigr)^2\bigr].
+\end{gather}
+
+这些损失函数衡量的是：
 \begin{itemize}
-    \item \textbf{Baseline CNN}（左图）：熵值在训练初期（约前 1000 episodes）迅速坍塌至 0 附近。这表明模型极快地陷入了确定性策略，虽然收敛速度快，但也意味着它可能过早地放弃了对更优策略的探索（Premature Convergence）。
-    \item \textbf{Attention Actor}（中图）：熵值表现出极大的震荡性，且经常出现异常尖峰。这说明单纯在 CNN 后附加 Attention 层可能引入了训练的不稳定性，导致策略分布难以稳定收敛。
-    \item \textbf{Transformer Actor}（右图）：熵值呈现出缓慢且平稳的下降趋势，在整个 10000 轮训练中始终维持在 0 以上。这意味着 Transformer 始终保持着一定的探索能力，这种“持续探索”的特性是其最终在胜率上超越 CNN 的关键原因。
+    \item \textbf{Actor}：在当前 Critic 评估下，策略能否选择高价值动作。
+    \item \textbf{Critic}：对当前策略生成的轨迹，价值估计是否准确。
 \end{itemize}
 
-\subsection{价值网络损失 (Critic Loss) 对比}
-Critic Loss ($L = MSE(R + \gamma Q_{next}, Q_{cur})$) 反映了价值网络对自己预测准确性的评估。
+然而，\textbf{最小化这些损失并不等价于找到纳什均衡}。
 
-\begin{figure}[H]
-    \centering
-    \begin{subfigure}{0.32\textwidth}
-        \includegraphics[width=\linewidth]{figures/baseline_cnn_critic_loss.png}
-        \caption{Baseline CNN}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}{0.32\textwidth}
-        \includegraphics[width=\linewidth]{figures/attention_critic_loss.png}
-        \caption{Attention Actor}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}{0.32\textwidth}
-        \includegraphics[width=\linewidth]{figures/transformer_critic_loss.png}
-        \caption{Transformer Actor}
-    \end{subfigure}
-    \caption{三种架构的 Critic Loss 变化趋势对比}
-    \label{fig:critic_loss_comparison}
-\end{figure}
+在 Self-Play 中，黑白双方共享同一个神经网络参数 $\theta$。训练过程可视为：
+\begin{equation}
+\theta_{t+1} = \theta_t - \alpha \nabla_\theta \mathcal{L}(\theta_t, \theta_t).
+\end{equation}
 
-\textbf{分析：}
+这里的问题在于：\textbf{对手策略是自己的历史版本，而非固定策略}。当 $\theta$ 更新时，对手策略 $\pi_{\theta_t}$ 也随之变化，导致优化目标不断漂移。即使某一时刻 Loss 达到局部最优，下一步对手策略改变后，这个"最优"就失效了。
+
+Actor-Critic 本质上是基于策略梯度的局部优化方法。即使收敛，也只能保证到达\textbf{局部最优点或鞍点}，而非全局纳什均衡。
+
+\section{实验证据}
+
+我们的实验结果恰好支持了上述理论分析：
+
+\begin{enumerate}
+    \item \textbf{性能震荡}：表 \ref{tab:internal_eval} 显示，训练到 9999 轮的模型反而不如 8499 轮模型强。这说明即使 Loss 持续下降，策略强度也可能退化（Forgetting）。
+    
+    \item \textbf{循环现象}：Transformer Actor 的 Entropy 和 Loss 曲线（图 \ref{fig:entropy_comparison}、\ref{fig:actor_loss_comparison}）有时表现出突然上升到很高，然后再下降的现象，暗示策略可能刚跳出某个局部最优，又陷入另一个局部最优，而不是稳定下降到纳什均衡。
+\end{enumerate}
+
+\chapter{课程反馈}
+
+\section{对课程及实验的建议}
+
+关于本学期的《人工智能与机器学习基础》课程，我们认为有以下几点影响上课体验的地方：
+
 \begin{itemize}
-    \item \textbf{Baseline CNN}：Critic Loss 迅速降低并保持在极低水平。这与熵的快速坍塌一致——由于 Actor 总是走“老路”，Critic 面对的状态非常单一，因此很容易“猜对”价值，但这是一种虚假的“准确”。
-    \item \textbf{Transformer Actor}：Critic Loss 在训练后期仍保持一定的波动。这是良性的信号：由于 Transformer Actor 持续探索新动作，Critic 不断被迫面对分布外（Out-of-Distribution）的新局面，从而推动价值网络不断修正和学习，最终获得更鲁棒的全局估值能力。
+    \item \textbf{教学内容与实验内容相关性低}：课程内容涵盖了大量机器学习基础理论和算法，但与实验项目（如三次小实验，一次大实验）的关联性不强；不需要理解各种理论细节就可以完成实验任务。
+    \item \textbf{实验完成基本要求太容易，拓展部分缺乏详细说明}：实验项目难度跨度较大，拿基本分（补全所有代码、写好报告）并不难，给分标准也很明确；但是作为一门 4 学分的主课且没有期末考试，同学们\textit{普遍期望挑战更高难度的内容}来提升自己的能力且取得不错的成绩。
+    
+    目前的实验内容在\textit{实验拓展}的评分标准尚不明确，实验往往要么\textit{缺乏拓展性}（比如 LAB2 的 MNIST 聚类实验，达到实验效果就难以对其进行更加详细的分析）或者\textit{拓展内容过于宽泛}（比如本次 Final-Project 的 gobang 部分，五子棋 AI 的优化空间巨大，导致同学们在试错的过程中过于盲目，付出大量时间但对模型表现收获甚微）。
 \end{itemize}
 
-\subsection{策略网络损失 (Actor Loss) 对比}
-Actor 的目标是最大化期望回报，代码中体现为最小化 $Loss = -\text{mean}(\log \pi(a|s) \cdot Q(s,a))$。
+我相信，这门课程设立的初衷是希望同学们能够通过理论学习和动手实践，掌握机器学习的\textit{基本方法}并具备一定的\textit{研究能力}；因此，实验应当具有一定的\textit{学术性}，报告的要求也应当体现出 AI 领域的\textit{科研范式}。
 
-\begin{figure}[H]
-    \centering
-    \begin{subfigure}{0.32\textwidth}
-        \includegraphics[width=\linewidth]{figures/baseline_cnn_actor_loss.png}
-        \caption{Baseline CNN}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}{0.32\textwidth}
-        \includegraphics[width=\linewidth]{figures/attention_actor_loss.png}
-        \caption{Attention Actor}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}{0.32\textwidth}
-        \includegraphics[width=\linewidth]{figures/transformer_actor_loss.png}
-        \caption{Transformer Actor}
-    \end{subfigure}
-    \caption{三种架构的 Actor Loss 变化趋势对比}
-    \label{fig:actor_loss_comparison}
-\end{figure}
+因此我们对课程和实验提出如下的建议：
 
-\textbf{分析：}
 \begin{itemize}
-    \item \textbf{Baseline CNN}：Actor Loss 曲线非常平滑且趋近于 0，再次印证了其策略的单一性。
-    \item \textbf{Transformer Actor}：Loss 曲线呈现出有节奏的震荡。结合 Transformer 最终 99\% 的胜率来看，这种震荡并非训练失败，而是策略在高维空间中不断调整优化方向的表现。相比于 CNN 的“固步自封”，Transformer 在不断尝试寻找更优的梯度方向。
+    \item \textbf{「任务导向」向「目标导向」的转化}：传统的“补全代码”任务很容易借由 AI 工具速通，给分模式也太过单一；建议将实验任务设计为“实现某个目标”，以下是一些示例：
+    \begin{itemize}
+        \item 助教给出一个强模型，同学们需要完成 Ablation Study，修改代码（比如增加一些 \verb|argparse| 参数）自行设计一些对比实验，分析不同设计对模型性能的贡献，并书写实验报告；
+        
+        难点在于\textit{实验设计}，代码修改的\textit{审美观}，以及\textit{结果分析}；这个可能适合作为 LAB1 的拓展内容；
+        \item 给定一个任务，要求同学们可以参考一些参考资料中提到的一些方法，使模型的效果达到某个效果或以上；无脑选择所有优化手段并不能拿高分，在达成效果的前提下，需要同学们分析不同因素对最终结果的影响大小，能够选择较少的优化手段达成目标会有更高的分数；
+        
+        难点在于\textit{方法选择}的思考，以及\textit{结果分析}；这个可能适合作为中间某次实验的拓展内容；
+    \end{itemize}
+    \item \textbf{重「效果」的实验，增加指导，增设容错}：对于重效果的实验（比如本次 Final-Project 的 gobang 部分），建议在实验说明中给出一些\textit{常见问题的排查}指导，帮助同学们更快地定位问题，减少盲目试错的时间浪费；另外，建议增设一些\textit{容错机制}，比如在效果不理想时，可以分析\textit{失败机理}（比如 Mode Collapse 的分析）。
 \end{itemize}
-
-\subsection{总结}
-通过上述三组曲线的对比，我们可以得出结论：在小样本、零和博弈的强化学习任务中，\textbf{避免过早收敛}是提升最终性能的关键。虽然 Baseline CNN 训练曲线看起来平滑、收敛快，但其性能上限被锁死；而 \textbf{Transformer} 凭借其架构天然的低归纳偏置（Inductive Bias），虽然训练过程看起来高熵、高 Loss 波动，但最终学会了更复杂的全局策略，实现了性能的反超。
 
 \end{document}
